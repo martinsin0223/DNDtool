@@ -267,6 +267,36 @@ button.icon { padding: 6px 10px; }
   color: var(--theme-text-muted);
   font-size: 12px;
 }
+.object-panel-tools {
+  border-bottom: 1px solid var(--theme-bg-input);
+  padding: 8px;
+  display: grid;
+  gap: 7px;
+}
+.object-panel-search {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-radius-sm);
+  background: var(--theme-bg-input);
+  color: var(--theme-text);
+  padding: 0 10px;
+  font-size: 13px;
+}
+.object-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+.object-filter {
+  min-height: 30px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+.object-filter.active {
+  border-color: var(--theme-accent);
+  background: color-mix(in srgb, var(--theme-accent) 18%, var(--theme-bg-input));
+}
 .object-panel-list {
   flex: 1;
   min-height: 0;
@@ -288,7 +318,7 @@ button.icon { padding: 6px 10px; }
   padding: 6px 6px;
   margin-bottom: 4px;
   display: grid;
-  grid-template-columns: 34px 1fr 34px;
+  grid-template-columns: 34px 1fr 32px 32px;
   gap: 8px;
   align-items: center;
   text-align: left;
@@ -332,12 +362,22 @@ button.icon { padding: 6px 10px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.object-locate {
+.object-locate,
+.object-edit {
   width: 32px;
   height: 32px;
   min-height: 32px;
   padding: 0;
   border-radius: var(--theme-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-text-muted);
+}
+.object-locate:hover,
+.object-edit:hover {
+  background: color-mix(in srgb, var(--theme-accent) 18%, transparent);
+  color: var(--theme-text);
 }
 .object-empty {
   color: var(--theme-text-muted);
@@ -1047,6 +1087,8 @@ const state = {
   uiMode: 'normal',
   surfaceMode: 'live',
   presentMode: false,
+  objectPanelFilter: 'all',
+  objectPanelQuery: '',
   toolbarPeekTimer: null,
   // Pointer 状态
   pointers: new Map(),
@@ -1354,6 +1396,13 @@ function objectMaskLabel(kind, item) {
   return 'Token';
 }
 
+function objectKindLabel(kind) {
+  if (kind === 'event') return '事件';
+  if (kind === 'token') return 'Token';
+  if (kind === 'annotation') return '标注';
+  return '对象';
+}
+
 function objectTitle(kind, item) {
   if (kind === 'event') return item.title || '（未命名事件）';
   if (kind === 'annotation') {
@@ -1378,32 +1427,54 @@ function objectSizeSummary(kind, item) {
   return `${Math.round(item.size || TOKEN_DEFAULT_SIZE)}px`;
 }
 
-function updateObjectPanel() {
-  const panel = $('object-panel');
-  if (!panel || !isEditSurface()) return;
-  const items = [
+function objectMatchesPanelQuery(kind, item, q) {
+  if (!q) return true;
+  const haystack = [
+    objectKindLabel(kind),
+    objectTitle(kind, item),
+    objectMaskLabel(kind, item),
+    objectSizeSummary(kind, item),
+    kind === 'event' ? item.content : '',
+    kind === 'annotation' && item.type === 'text' ? item.text : '',
+  ].join(' ').toLowerCase();
+  return haystack.includes(q);
+}
+
+function getFilteredObjectPanelItems() {
+  const filter = ['all', 'event', 'token', 'annotation'].includes(state.objectPanelFilter)
+    ? state.objectPanelFilter
+    : 'all';
+  const query = String(state.objectPanelQuery || '').trim().toLowerCase();
+  const itemsAll = [
     ...state.events.map((item) => ({ kind: 'event', item })),
     ...state.tokens.map((item) => ({ kind: 'token', item })),
     ...state.annotations.map((item) => ({ kind: 'annotation', item })),
   ];
+  const items = itemsAll.filter((row) => (
+    (filter === 'all' || row.kind === filter) &&
+    objectMatchesPanelQuery(row.kind, row.item, query)
+  ));
+  return { filter, itemsAll, items };
+}
+
+function renderObjectPanelList() {
+  const panel = $('object-panel');
+  const list = $('object-panel-list');
+  if (!panel || !list || !isEditSurface()) return;
+  const { itemsAll, items } = getFilteredObjectPanelItems();
   const selected = getSelectedObject();
   const sceneName = state.currentSceneId && state.scenes[state.currentSceneId]
     ? (state.scenes[state.currentSceneId].name || '当前场景')
     : '当前场景';
-  panel.innerHTML = `
-    <div class="object-panel-header">
-      <div>
-        <div class="object-panel-title">对象</div>
-        <div class="object-panel-meta">${escapeHtml(sceneName)} · ${items.length} 项</div>
-      </div>
-      <button id="object-panel-live" title="回到跑团态">回到跑团</button>
-    </div>
-    <div class="object-panel-list" id="object-panel-list"></div>
-  `;
-  $('object-panel-live').addEventListener('click', () => setSurfaceMode('live'));
-  const list = $('object-panel-list');
-  if (items.length === 0) {
+  const meta = $('object-panel-meta');
+  if (meta) meta.textContent = `${sceneName} · ${items.length}/${itemsAll.length} 项`;
+  list.innerHTML = '';
+  if (itemsAll.length === 0) {
     list.innerHTML = '<div class="object-empty">当前场景还没有事件、Token 或标注。</div>';
+    return;
+  }
+  if (items.length === 0) {
+    list.innerHTML = '<div class="object-empty">没有匹配的对象。</div>';
     return;
   }
   const sections = [
@@ -1430,15 +1501,64 @@ function updateObjectPanel() {
           <span class="object-sub">${escapeHtml(objectMaskLabel(row.kind, row.item))} · ${escapeHtml(objectSizeSummary(row.kind, row.item))}</span>
         </span>
         <span class="object-locate" title="定位">⌖</span>
+        <span class="object-edit" title="编辑">✎</span>
       `;
       btn.addEventListener('click', (e) => {
         const locate = Boolean(e.target.closest('.object-locate'));
+        const edit = Boolean(e.target.closest('.object-edit'));
+        if (edit) {
+          setSelectedObject(row.kind, row.item.id, { render: false });
+          editObjectFromPanel(row.kind, row.item.id);
+          return;
+        }
         setSelectedObject(row.kind, row.item.id, { locate });
       });
       btn.addEventListener('dblclick', () => editObjectFromPanel(row.kind, row.item.id));
       list.appendChild(btn);
     }
   }
+}
+
+function updateObjectPanel() {
+  const panel = $('object-panel');
+  if (!panel || !isEditSurface()) return;
+  const { filter } = getFilteredObjectPanelItems();
+  const filterTabs = [
+    ['all', '全部'],
+    ['event', '事件'],
+    ['token', 'Token'],
+    ['annotation', '标注'],
+  ].map(([value, label]) => (
+    `<button class="object-filter${filter === value ? ' active' : ''}" data-filter="${value}">${label}</button>`
+  )).join('');
+  panel.innerHTML = `
+    <div class="object-panel-header">
+      <div>
+        <div class="object-panel-title">对象</div>
+        <div id="object-panel-meta" class="object-panel-meta"></div>
+      </div>
+      <button id="object-panel-live" title="回到跑团态">回到跑团</button>
+    </div>
+    <div class="object-panel-tools">
+      <input id="object-panel-search" class="object-panel-search" type="search" placeholder="搜索对象、内容或遮罩层" value="${escapeHtml(state.objectPanelQuery || '')}">
+      <div class="object-filter-tabs">${filterTabs}</div>
+    </div>
+    <div class="object-panel-list" id="object-panel-list"></div>
+  `;
+  $('object-panel-live').addEventListener('click', () => setSurfaceMode('live'));
+  const search = $('object-panel-search');
+  search.addEventListener('input', (e) => {
+    state.objectPanelQuery = e.target.value;
+    renderObjectPanelList();
+  });
+  document.querySelectorAll('.object-filter').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.objectPanelFilter = btn.dataset.filter || 'all';
+      document.querySelectorAll('.object-filter').forEach((x) => x.classList.toggle('active', x === btn));
+      renderObjectPanelList();
+    });
+  });
+  renderObjectPanelList();
 }
 
 function editObjectFromPanel(kind, id) {
@@ -2047,7 +2167,7 @@ async function exportProject() {
     const payload = {
       format: 'fog-of-war-map.fogbundle',
       schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
-      appVersion: 'v3.7.0',
+      appVersion: 'v3.7.1',
       exportedAt: new Date().toISOString(),
       sceneCount: scenes.length,
       currentSceneId: state.currentSceneId,
@@ -2203,17 +2323,21 @@ async function doImportSceneBundle(payload, selectedFiles) {
       });
     }
     if (!preparedEntries.length) throw new Error('没有选择可导入的场景');
-    const first = preparedEntries[0];
-    const firstPreparedRestore = await prepareSavedRestore(first.scene, first.scene.mapSize);
+    const preferred = preparedEntries.find((entry) => entry.scene.importedFromSceneId && entry.scene.importedFromSceneId === payload.currentSceneId)
+      || preparedEntries[0];
+    const preferredPreparedRestore = await prepareSavedRestore(preferred.scene, preferred.scene.mapSize);
     for (const entry of preparedEntries) {
       state.scenes[entry.newId] = entry.scene;
     }
-    state.currentSceneId = first.newId;
-    state.mapFingerprint = first.scene.mapFingerprint;
-    commitPreparedMap(first.preparedMap);
-    applyPreparedRestore(firstPreparedRestore, { fitViewAfterRestore: true });
-    if (payload.customTheme) {
-      try { loadCustomTheme(payload.customTheme); } catch (e) { console.warn('导入主题失败', e); }
+    state.currentSceneId = preferred.newId;
+    state.mapFingerprint = preferred.scene.mapFingerprint;
+    commitPreparedMap(preferred.preparedMap);
+    applyPreparedRestore(preferredPreparedRestore, { fitViewAfterRestore: true });
+    if (Object.prototype.hasOwnProperty.call(payload, 'customTheme')) {
+      try {
+        if (payload.customTheme) loadCustomTheme(payload.customTheme);
+        else applyTheme(DEFAULT_DARK_THEME);
+      } catch (e) { console.warn('导入主题失败', e); }
     }
     await saveMainStrict();
     hideLoading();
