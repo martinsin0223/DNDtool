@@ -652,6 +652,60 @@ button.icon { padding: 6px 10px; }
   resize: vertical;
 }
 .form-row textarea { min-height: 96px; max-height: 240px; line-height: 1.5; }
+.form-row input[type="password"],
+.form-row input[type="url"] {
+  width: 100%;
+  background: var(--theme-bg-input);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-radius-sm);
+  padding: 10px 12px;
+  color: var(--theme-text);
+  font-family: inherit;
+  font-size: 14px;
+}
+.form-note {
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.form-note.danger { color: var(--theme-danger); }
+.form-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--theme-text);
+  font-size: 13px;
+}
+.cloud-status-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 4px;
+  font-size: 13px;
+}
+.cloud-status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--theme-bg-input);
+  padding-bottom: 8px;
+}
+.cloud-status-row span:first-child { color: var(--theme-text-muted); }
+.cloud-status-row span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+.cloud-error {
+  color: var(--theme-danger);
+  border: 1px solid color-mix(in srgb, var(--theme-danger) 45%, transparent);
+  border-radius: var(--theme-radius-sm);
+  padding: 9px 10px;
+  margin: 10px 0;
+  background: color-mix(in srgb, var(--theme-danger) 10%, transparent);
+  font-size: 13px;
+}
 .shape-options, .color-options {
   display: flex;
   gap: 8px;
@@ -800,6 +854,45 @@ button.icon { padding: 6px 10px; }
   margin-bottom: 16px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+#loading-overlay .loading-actions {
+  margin-top: 14px;
+}
+#loading-overlay .loading-actions button {
+  min-width: 112px;
+}
+#cloud-sync-pending-banner {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1750;
+  display: none;
+  max-width: min(880px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--theme-warn) 45%, var(--theme-border));
+  background: color-mix(in srgb, var(--theme-panel) 92%, black 8%);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--theme-radius-md);
+  align-items: center;
+  gap: 10px;
+}
+#cloud-sync-pending-banner.visible {
+  display: flex;
+}
+#cloud-sync-pending-banner .banner-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--theme-text);
+}
+#cloud-sync-pending-banner .banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#cloud-sync-pending-banner .banner-actions button {
+  white-space: nowrap;
+}
 
 /* ============== Splash ============== */
 #splash {
@@ -1667,7 +1760,19 @@ button.active,
   <div id="dropdown-menu"></div>
 </div>
 <div id="modal-root"></div>
-<div id="loading-overlay"><div class="spinner"></div><div id="loading-text">加载中…</div></div>
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div id="loading-text">加载中…</div>
+  <div class="loading-actions"><button id="loading-cancel" style="display:none;">取消上传</button></div>
+</div>
+<div id="cloud-sync-pending-banner">
+  <div class="banner-text" id="cloud-sync-pending-text"></div>
+  <div class="banner-actions">
+    <button id="cloud-sync-pending-resume">继续上传</button>
+    <button id="cloud-sync-pending-discard" class="danger">丢弃草稿</button>
+    <button id="cloud-sync-pending-close">关闭</button>
+  </div>
+</div>
 <input id="file-input-map" class="hidden-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp">
 <input id="file-input-token" class="hidden-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp">
 <input id="file-input-annotation-image" class="hidden-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp">
@@ -1830,6 +1935,25 @@ const state = {
   uploadingTokenFile: null,
   editingTokenId: null,
   hasMap: false,
+  cloudSync: {
+    status: 'disconnected',
+    repoOwner: 'martinsin0223',
+    repoName: 'DNDtool-state',
+    deviceId: null,
+    deviceLabel: '',
+    lastConnectAt: null,
+    busy: false,
+    lastUploadAt: null,
+    lastSnapshotId: null,
+    localDraftBeforeOverwrite: null,
+    snapshots: [],
+    hasPendingDraft: false,
+    draftSnapshotId: null,
+    tokenIsReadonly: false,
+    uploadCancel: null,
+    gcRunning: false,
+    lastError: null,
+  },
   isCoarsePointer: matchMedia('(pointer: coarse)').matches,
   _warnedBrushCap: false,
 };
@@ -2908,7 +3032,7 @@ async function exportProject() {
     const payload = {
       format: 'fog-of-war-map.fogbundle',
       schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
-      appVersion: 'v3.8.1',
+      appVersion: 'v3.10.0',
       exportedAt: new Date().toISOString(),
       sceneCount: scenes.length,
       currentSceneId: state.currentSceneId,
@@ -6289,11 +6413,1445 @@ function setupBrushSizeFromState() {
   $('brush-size-rail').value = state.brush.sizeScreen;
 }
 
-function setLoading(text) {
+function setLoading(text, opts = {}) {
   $('loading-text').textContent = text || '加载中…';
+  const cancelBtn = $('loading-cancel');
+  if (cancelBtn) {
+    cancelBtn.style.display = opts.onCancel ? 'inline-flex' : 'none';
+    cancelBtn.onclick = opts.onCancel || null;
+  }
   $('loading-overlay').classList.add('visible');
 }
-function hideLoading() { $('loading-overlay').classList.remove('visible'); }
+function hideLoading() {
+  $('loading-overlay').classList.remove('visible');
+  const cancelBtn = $('loading-cancel');
+  if (cancelBtn) {
+    cancelBtn.style.display = 'none';
+    cancelBtn.onclick = null;
+  }
+}
+
+// ============== 云存档（v3.10.0） ==============
+const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
+const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
+const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
+const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.10.0';
+const CLOUD_SYNC_SCHEMA_VERSION = 4;
+const CLOUD_SYNC_LATEST_PATH = 'latest.json';
+const CLOUD_SYNC_MAP_CACHE_PREFIX = 'cloudSync:map:';
+const CLOUD_SYNC_PENDING_PREFIX = 'pending';
+const CLOUD_SYNC_SNAPSHOTS_PREFIX = 'snapshots';
+const CLOUD_SYNC_MAPS_PREFIX = 'maps';
+const CLOUD_SYNC_ACCEPT_JSON = 'application/vnd.github+json';
+const CLOUD_SYNC_ACCEPT_RAW = 'application/vnd.github.raw+json';
+const CLOUD_SYNC_SINGLE_LIMIT = 20 * 1024 * 1024;
+const CLOUD_SYNC_REQUEST_GAP_MS = 100;
+
+function cloudSync_getToken() {
+  return localStorage.getItem(CLOUD_SYNC_TOKEN_KEY) || sessionStorage.getItem(CLOUD_SYNC_TOKEN_KEY) || null;
+}
+function cloudSync_setToken(token, trusted = false) {
+  const clean = String(token || '').trim();
+  sessionStorage.removeItem(CLOUD_SYNC_TOKEN_KEY);
+  localStorage.removeItem(CLOUD_SYNC_TOKEN_KEY);
+  if (!clean) return;
+  if (trusted) localStorage.setItem(CLOUD_SYNC_TOKEN_KEY, clean);
+  else sessionStorage.setItem(CLOUD_SYNC_TOKEN_KEY, clean);
+}
+function cloudSync_clearToken() {
+  localStorage.removeItem(CLOUD_SYNC_TOKEN_KEY);
+  sessionStorage.removeItem(CLOUD_SYNC_TOKEN_KEY);
+}
+function cloudSync_isTrusted() {
+  return Boolean(localStorage.getItem(CLOUD_SYNC_TOKEN_KEY));
+}
+function cloudSync_getDeviceId() {
+  let id = localStorage.getItem(CLOUD_SYNC_DEVICE_ID_KEY);
+  if (!/^[0-9a-f]{16}$/i.test(id || '')) {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    id = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    localStorage.setItem(CLOUD_SYNC_DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+function cloudSync_getDeviceLabel() {
+  return localStorage.getItem(CLOUD_SYNC_DEVICE_LABEL_KEY) || '';
+}
+function cloudSync_encodePath(path) {
+  return String(path || '').split('/').filter(Boolean).map((part) => encodeURIComponent(part)).join('/');
+}
+function cloudSync_sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function cloudSync_stringToBytes(text) {
+  return new TextEncoder().encode(String(text || ''));
+}
+function cloudSync_bytesToString(bytes) {
+  return new TextDecoder().decode(bytes);
+}
+function cloudSync_bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  return btoa(binary);
+}
+function cloudSync_base64ToBytes(base64) {
+  const clean = String(base64 || '').replace(/\s+/g, '');
+  const binary = atob(clean);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+async function cloudSync_streamToBytes(stream) {
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function cloudSync_blobToBytes(blob) {
+  return new Uint8Array(await blob.arrayBuffer());
+}
+function cloudSync_mapCacheKey(sha256) {
+  return `${CLOUD_SYNC_MAP_CACHE_PREFIX}${sha256}`;
+}
+async function cloudSync_readCachedMap(sha256) {
+  return await idbGet(cloudSync_mapCacheKey(sha256));
+}
+async function cloudSync_writeCachedMap(sha256, blob) {
+  try { await idbPut(cloudSync_mapCacheKey(sha256), blob); } catch (_) {}
+}
+function cloudSync_formatTime(iso) {
+  if (!iso) return '尚未连接';
+  try { return new Date(iso).toLocaleString('zh-CN', { hour12: false }); }
+  catch (_) { return iso; }
+}
+function cloudSync_formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+function cloudSync_setBusy(flag) {
+  state.cloudSync.busy = !!flag;
+}
+function cloudSync_makeError(info) {
+  const err = new Error(info && info.userMessage ? info.userMessage : '云存档失败');
+  return Object.assign(err, info || {});
+}
+async function cloudSync_sha256(bytes) {
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+async function cloudSync_compressBytes(bytes) {
+  if (!('CompressionStream' in window)) return bytes;
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+  return await cloudSync_streamToBytes(stream);
+}
+async function cloudSync_decompressBytes(bytes, compression = 'gzip') {
+  if (compression === 'none') return bytes;
+  if (!('DecompressionStream' in window)) {
+    throw cloudSync_makeError({ code: 'decompressionUnsupported', userMessage: '当前设备不支持云存档解压。请升级浏览器或 iPadOS。' });
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return await cloudSync_streamToBytes(stream);
+}
+async function cloudSync_compressStateBundleBytes(bytes) {
+  if (!('CompressionStream' in window)) {
+    return { bytes, compression: 'none' };
+  }
+  return { bytes: await cloudSync_compressBytes(bytes), compression: 'gzip' };
+}
+function cloudSync_chunkBytes(bytes, chunkBytes = CLOUD_SYNC_SINGLE_LIMIT) {
+  const chunks = [];
+  for (let offset = 0, index = 0; offset < bytes.length; offset += chunkBytes, index++) {
+    chunks.push({ index, bytes: bytes.subarray(offset, Math.min(bytes.length, offset + chunkBytes)) });
+  }
+  return chunks.length ? chunks : [{ index: 0, bytes: new Uint8Array(0) }];
+}
+function cloudSync_chunkName(index) {
+  return `${String(index).padStart(4, '0')}.bin.b64`;
+}
+function cloudSync_withAbort(controller) {
+  return controller ? { signal: controller.signal } : {};
+}
+function cloudSync_assertNotAborted(controller) {
+  if (controller && controller.signal && controller.signal.aborted) {
+    throw cloudSync_makeError({ code: 'uploadCancelled', userMessage: '上传已取消。' });
+  }
+}
+function cloudSync_setPendingBanner(text, actions = {}) {
+  const root = $('cloud-sync-pending-banner');
+  if (!root) return;
+  $('cloud-sync-pending-text').textContent = text || '';
+  root.classList.toggle('visible', !!text);
+  $('cloud-sync-pending-resume').onclick = actions.onResume || null;
+  $('cloud-sync-pending-discard').onclick = actions.onDiscard || null;
+  $('cloud-sync-pending-close').onclick = actions.onClose || (() => cloudSync_setPendingBanner(''));
+}
+function cloudSync_clearPendingBanner() {
+  cloudSync_setPendingBanner('');
+}
+function cloudSync_openPatPage() {
+  window.open(CLOUD_SYNC_PAT_PAGE, '_blank', 'noopener,noreferrer');
+}
+async function cloudSync_fetchApi(path, options = {}, repoInfo = {}) {
+  const token = repoInfo.token || cloudSync_getToken();
+  const method = (options.method || 'GET').toUpperCase();
+  const headers = Object.assign({ Accept: CLOUD_SYNC_ACCEPT_JSON }, options.headers || {});
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (method === 'POST' || method === 'PUT' || method === 'PATCH') headers['Content-Type'] = 'application/json';
+  return fetch(`https://api.github.com${path}`, { ...options, method, headers });
+}
+async function cloudSync_classifyError(response, errOrNetwork) {
+  if (errOrNetwork || !response) {
+    return { code: 'network', userMessage: '连不上 GitHub。检查一下网络再试。', raw: errOrNetwork || null };
+  }
+  let body = null;
+  try { body = await response.clone().json(); }
+  catch (_) {
+    try { body = { message: await response.clone().text() }; } catch (_) {}
+  }
+  const msg = String(body && body.message || '');
+  const status = response.status;
+  const raw = { status, body };
+  if (status === 401 && /expired/i.test(msg + ' ' + (response.headers.get('github-authentication-token-expiration') || ''))) {
+    return { code: 'expiredToken', userMessage: '这把钥匙已经过期。回 GitHub 做一把新的。', hint: CLOUD_SYNC_PAT_PAGE, raw };
+  }
+  if (status === 401 && /bad credentials/i.test(msg)) {
+    return { code: 'invalidToken', userMessage: '这串钥匙 GitHub 不认。可能是输错了。', raw };
+  }
+  if (status === 404) {
+    return { code: 'repoNotFound', userMessage: '找不到你的云存档保险柜(DNDtool-state)。是不是删掉了或改名了?', raw };
+  }
+  if (status === 403) {
+    return { code: 'forbidden', userMessage: '这把钥匙打不开这个保险柜。配的时候没勾对权限。', hint: CLOUD_SYNC_PAT_PAGE, raw };
+  }
+  if (status === 409) {
+    return { code: 'latestConflict', userMessage: '云端比你这台电脑新。是不是别处也改了?暂不支持冲突合并,本次取消。', raw };
+  }
+  return { code: 'unknown', userMessage: `GitHub 返回了意外错误(HTTP ${status})。`, raw };
+}
+async function cloudSync_testConnection({ owner, repo, token }) {
+  try {
+    const response = await cloudSync_fetchApi(`/repos/${owner}/${repo}`, { method: 'GET' }, { owner, repo, token });
+    if (response.ok) {
+      const body = await response.json();
+      return { ok: true, repo: body, tokenIsReadonly: !(body && body.permissions && body.permissions.push) };
+    }
+    return { ok: false, error: await cloudSync_classifyError(response) };
+  } catch (err) {
+    return { ok: false, error: await cloudSync_classifyError(null, err) };
+  }
+}
+async function cloudSync_getJsonFile({ owner, repo, token, path, allowMissing = false }) {
+  const encodedPath = cloudSync_encodePath(path);
+  try {
+    const response = await cloudSync_fetchApi(`/repos/${owner}/${repo}/contents/${encodedPath}`, { method: 'GET' }, { owner, repo, token });
+    if (response.status === 404 && allowMissing) return null;
+    if (!response.ok) throw cloudSync_makeError(await cloudSync_classifyError(response));
+    const body = await response.json();
+    const content = typeof body.content === 'string' ? body.content.replace(/\n/g, '') : '';
+    const json = JSON.parse(cloudSync_bytesToString(cloudSync_base64ToBytes(content)));
+    return { json, sha: body.sha || null, path: body.path || path };
+  } catch (err) {
+    if (allowMissing && err && err.code === 'repoNotFound') return null;
+    throw err;
+  }
+}
+async function cloudSync_getRawTextFile({ owner, repo, token, path, allowMissing = false }) {
+  const encodedPath = cloudSync_encodePath(path);
+  try {
+    const response = await cloudSync_fetchApi(`/repos/${owner}/${repo}/contents/${encodedPath}`, {
+      method: 'GET',
+      headers: { Accept: CLOUD_SYNC_ACCEPT_RAW },
+    }, { owner, repo, token });
+    if (response.status === 404 && allowMissing) return null;
+    if (!response.ok) throw cloudSync_makeError(await cloudSync_classifyError(response));
+    return await response.text();
+  } catch (err) {
+    if (allowMissing && err && err.code === 'repoNotFound') return null;
+    throw err;
+  }
+}
+async function cloudSync_listContents({ owner, repo, token, path = '', allowMissing = false }) {
+  const encodedPath = cloudSync_encodePath(path);
+  const suffix = encodedPath ? `/contents/${encodedPath}` : '/contents';
+  try {
+    const response = await cloudSync_fetchApi(`/repos/${owner}/${repo}${suffix}`, { method: 'GET' }, { owner, repo, token });
+    if (response.status === 404 && allowMissing) return [];
+    if (!response.ok) throw cloudSync_makeError(await cloudSync_classifyError(response));
+    const body = await response.json();
+    return Array.isArray(body) ? body : [];
+  } catch (err) {
+    if (allowMissing && err && err.code === 'repoNotFound') return [];
+    throw err;
+  }
+}
+async function cloudSync_putTextFile({ owner, repo, token, path, text, sha = null, message = null }) {
+  const encodedPath = cloudSync_encodePath(path);
+  const body = {
+    message: message || `cloud sync update ${path}`,
+    content: cloudSync_bytesToBase64(cloudSync_stringToBytes(text)),
+  };
+  const headers = {};
+  if (sha) {
+    body.sha = sha;
+    headers['If-Match'] = sha;
+  }
+  const response = await cloudSync_fetchApi(`/repos/${owner}/${repo}/contents/${encodedPath}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body),
+  }, { owner, repo, token });
+  if (!response.ok) throw cloudSync_makeError(await cloudSync_classifyError(response));
+  return await response.json();
+}
+async function cloudSync_deleteFile({ owner, repo, token, path, sha, message = null }) {
+  const encodedPath = cloudSync_encodePath(path);
+  const response = await cloudSync_fetchApi(`/repos/${owner}/${repo}/contents/${encodedPath}`, {
+    method: 'DELETE',
+    body: JSON.stringify({
+      message: message || `cloud sync delete ${path}`,
+      sha,
+    }),
+  }, { owner, repo, token });
+  if (!response.ok) throw cloudSync_makeError(await cloudSync_classifyError(response));
+  return await response.json();
+}
+async function cloudSync_headContent({ owner, repo, token, path }) {
+  const encodedPath = cloudSync_encodePath(path);
+  const response = await cloudSync_fetchApi(`/repos/${owner}/${repo}/contents/${encodedPath}`, {
+    method: 'HEAD',
+  }, { owner, repo, token });
+  if (response.status === 404) return false;
+  if (!response.ok) throw cloudSync_makeError(await cloudSync_classifyError(response));
+  return true;
+}
+async function cloudSync_deleteTree({ owner, repo, token, basePath }) {
+  const list = await cloudSync_listContents({ owner, repo, token, path: basePath, allowMissing: true });
+  for (const entry of list) {
+    if (entry.type === 'dir') {
+      await cloudSync_deleteTree({ owner, repo, token, basePath: entry.path });
+    } else if (entry.type === 'file') {
+      await cloudSync_deleteFile({
+        owner,
+        repo,
+        token,
+        path: entry.path,
+        sha: entry.sha,
+        message: `cloud sync delete ${entry.path}`,
+      });
+      await cloudSync_sleep(CLOUD_SYNC_REQUEST_GAP_MS);
+    }
+  }
+}
+async function cloudSync_serializeStateBundle() {
+  if (state.gridCalibration) throw cloudSync_makeError({ code: 'gridCalibration', userMessage: '请先完成或取消网格校准。' });
+  if (!state.hasMap || !state.currentSceneId) throw cloudSync_makeError({ code: 'noMap', userMessage: '请先加载地图。' });
+  await syncActiveSceneToMemory();
+  const sceneEntries = Object.entries(state.scenes || {});
+  if (!sceneEntries.length) throw cloudSync_makeError({ code: 'emptyScenes', userMessage: '没有可上传的场景。' });
+  const scenes = [];
+  for (const [sceneId, scene] of sceneEntries) {
+    if (!scene || !scene.mapBlob) {
+      throw cloudSync_makeError({ code: 'missingMap', userMessage: `场景"${scene?.name || sceneId || '未命名'}"还没有地图，暂时不能上传云端。` });
+    }
+    scenes.push(await serializeSceneForBundle(sceneId, scene));
+  }
+  const isDefaultTheme = state.theme === DEFAULT_DARK_THEME;
+  return {
+    format: 'fog-of-war-map.fogbundle',
+    schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
+    appVersion: CLOUD_SYNC_TOOL_VERSION,
+    exportedAt: new Date().toISOString(),
+    sceneCount: scenes.length,
+    currentSceneId: state.currentSceneId,
+    scenes,
+    themeId: 'default-dark',
+    customTheme: isDefaultTheme ? null : state.theme,
+  };
+}
+async function cloudSync_collectMapBlobs() {
+  const entries = [];
+  for (const [sceneId, scene] of Object.entries(state.scenes || {})) {
+    if (!scene || !scene.mapBlob) {
+      throw cloudSync_makeError({ code: 'missingMap', userMessage: `场景"${scene?.name || sceneId || '未命名'}"还没有地图，暂时不能上传云端。` });
+    }
+    const bytes = await cloudSync_blobToBytes(scene.mapBlob);
+    entries.push({
+      sceneId,
+      sceneName: scene.name || '场景',
+      sha256: await cloudSync_sha256(bytes),
+      blob: scene.mapBlob,
+      bytes,
+      byteSize: scene.mapBlob.size || bytes.length,
+      mime: scene.mapBlob.type || 'application/octet-stream',
+      mapSize: scene.mapSize || null,
+    });
+  }
+  return entries;
+}
+async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
+  if (!bundleJson || bundleJson.format !== 'fog-of-war-map.fogbundle') {
+    throw cloudSync_makeError({ code: 'bundleInvalid', userMessage: '云端状态数据格式不正确。' });
+  }
+  if (!Array.isArray(bundleJson.scenes) || !bundleJson.scenes.length) {
+    throw cloudSync_makeError({ code: 'bundleEmpty', userMessage: '云端没有可恢复的场景。' });
+  }
+  const preparedEntries = [];
+  for (const scenePayload of bundleJson.scenes) {
+    const sceneId = scenePayload.sceneId || uuid();
+    const mapBlob = mapBlobsBySceneId[sceneId];
+    if (!mapBlob) {
+      throw cloudSync_makeError({ code: 'missingMapBlob', userMessage: `云端场景"${scenePayload.name || sceneId}"缺少地图原图。` });
+    }
+    const preparedMap = await prepareMapFromBlob(mapBlob);
+    if (scenePayload.mapSize && (scenePayload.mapSize.w !== preparedMap.w || scenePayload.mapSize.h !== preparedMap.h)) {
+      throw cloudSync_makeError({ code: 'mapSizeMismatch', userMessage: `云端场景"${scenePayload.name || sceneId}"地图尺寸不匹配。` });
+    }
+    const saved = await bundleScenePayloadToSaved(scenePayload);
+    const pair = await decodeAndValidateFogPair(saved, { w: preparedMap.w, h: preparedMap.h });
+    if (pair.terrainBmp && typeof pair.terrainBmp.close === 'function') pair.terrainBmp.close();
+    if (pair.eventFogBmp && typeof pair.eventFogBmp.close === 'function') pair.eventFogBmp.close();
+    preparedEntries.push({
+      newId: sceneId,
+      preparedMap,
+      scene: {
+        ...saved,
+        mapBlob,
+        mapFingerprint: scenePayload.mapFingerprint || null,
+        mapSize: { w: preparedMap.w, h: preparedMap.h },
+        name: scenePayload.name || '导入场景',
+        chapterNumber: sceneChapterNumber(scenePayload),
+        chapterTitle: sceneChapterTitle(scenePayload),
+        createdAt: Date.now(),
+        lastUsedAt: Date.now(),
+      },
+    });
+  }
+  const preferred = preparedEntries.find((entry) => entry.newId === bundleJson.currentSceneId) || preparedEntries[0];
+  const preferredPreparedRestore = await prepareSavedRestore(preferred.scene, preferred.scene.mapSize);
+  const nextScenes = {};
+  for (const entry of preparedEntries) nextScenes[entry.newId] = entry.scene;
+  state.scenes = nextScenes;
+  state.currentSceneId = preferred.newId;
+  state.mapFingerprint = preferred.scene.mapFingerprint || null;
+  commitPreparedMap(preferred.preparedMap);
+  applyPreparedRestore(preferredPreparedRestore, { fitViewAfterRestore: true });
+  if (Object.prototype.hasOwnProperty.call(bundleJson, 'customTheme')) {
+    try {
+      if (bundleJson.customTheme) loadCustomTheme(bundleJson.customTheme);
+      else applyTheme(DEFAULT_DARK_THEME);
+    } catch (e) {
+      console.warn('恢复主题失败', e);
+    }
+  }
+  await saveMainStrict();
+}
+function cloudSync_generateSnapshotId() {
+  const iso = new Date().toISOString().replace(/[:.]/g, '-');
+  return `${iso}_${(state.cloudSync.deviceId || cloudSync_getDeviceId()).slice(0, 6)}`;
+}
+function cloudSync_pendingManifestPath(snapshotId) {
+  return `${CLOUD_SYNC_PENDING_PREFIX}/${snapshotId}/manifest.draft.json`;
+}
+function cloudSync_snapshotManifestPath(snapshotId) {
+  return `${CLOUD_SYNC_SNAPSHOTS_PREFIX}/${snapshotId}/manifest.json`;
+}
+function cloudSync_snapshotChunkPath(snapshotId, index) {
+  return `${CLOUD_SYNC_SNAPSHOTS_PREFIX}/${snapshotId}/chunks/${cloudSync_chunkName(index)}`;
+}
+function cloudSync_mapBasePath(sha256) {
+  return `${CLOUD_SYNC_MAPS_PREFIX}/${sha256.slice(0, 2)}/${sha256}`;
+}
+function cloudSync_buildLatestPayload(snapshotId, manifestPath) {
+  return {
+    schemaVersion: CLOUD_SYNC_SCHEMA_VERSION,
+    snapshot_id: snapshotId,
+    manifest_path: manifestPath,
+    updated_at: new Date().toISOString(),
+    updated_by_device: state.cloudSync.deviceLabel || state.cloudSync.deviceId || cloudSync_getDeviceId(),
+    tool_version: CLOUD_SYNC_TOOL_VERSION,
+  };
+}
+function cloudSync_buildManifest({ snapshotId, mapsList, stateChunks, bundleJson, note, compression = 'gzip', locked = false, parentSnapshotId = null }) {
+  const scenes = Array.isArray(bundleJson && bundleJson.scenes) ? bundleJson.scenes : [];
+  const tokenCount = scenes.reduce((sum, scene) => sum + ((scene.tokens || []).length), 0);
+  const eventCount = scenes.reduce((sum, scene) => sum + ((scene.events || []).length), 0);
+  const annotationCount = scenes.reduce((sum, scene) => sum + ((scene.annotations || []).length), 0);
+  const uniqueSha = new Set(mapsList.map((item) => item.sha256));
+  return {
+    schemaVersion: CLOUD_SYNC_SCHEMA_VERSION,
+    snapshot_id: snapshotId,
+    created_at: new Date().toISOString(),
+    tool_version: CLOUD_SYNC_TOOL_VERSION,
+    device_id: state.cloudSync.deviceId || cloudSync_getDeviceId(),
+    device_label: state.cloudSync.deviceLabel || '',
+    parent_snapshot_id: parentSnapshotId,
+    note: String(note || '').trim(),
+    locked: !!locked,
+    scene_count: scenes.length,
+    map_count: scenes.length,
+    token_count: tokenCount,
+    annotation_count: annotationCount,
+    event_count: eventCount,
+    total_uncompressed_bytes: cloudSync_stringToBytes(JSON.stringify(bundleJson)).length,
+    total_compressed_bytes: stateChunks.reduce((sum, chunk) => sum + chunk.rawBytes.length, 0),
+    total_b64_bytes: stateChunks.reduce((sum, chunk) => sum + chunk.base64.length, 0),
+    state_chunks: stateChunks.map((chunk) => ({
+      index: chunk.index,
+      filename: `chunks/${cloudSync_chunkName(chunk.index)}`,
+      sha256: chunk.sha256,
+      size_bytes: chunk.base64.length,
+      status: chunk.status || 'pending',
+    })),
+    state_compression: compression,
+    state_chunk_size_bytes: CLOUD_SYNC_SINGLE_LIMIT,
+    maps: mapsList.map((item) => ({
+      scene_id: item.sceneId,
+      scene_name: item.sceneName,
+      map_sha256: item.sha256,
+      map_path: `${cloudSync_mapBasePath(item.sha256)}/`,
+      mime: item.mime,
+      original_bytes: item.byteSize,
+      downsampled_w: item.mapSize?.w || null,
+      downsampled_h: item.mapSize?.h || null,
+      map_chunk_count: item.chunkCount || 1,
+      created_at: new Date().toISOString(),
+      status: item.status || 'pending',
+    })),
+    maps_total_bytes: Array.from(uniqueSha).reduce((sum, sha) => {
+      const entry = mapsList.find((item) => item.sha256 === sha);
+      return sum + (entry ? entry.byteSize : 0);
+    }, 0),
+    maps_reused_count: 0,
+    maps_new_count: 0,
+  };
+}
+function cloudSync_parseManifest(json) {
+  if (!json || json.schemaVersion !== CLOUD_SYNC_SCHEMA_VERSION) {
+    throw cloudSync_makeError({ code: 'manifestInvalid', userMessage: '云端 manifest 版本不正确。' });
+  }
+  if (!json.snapshot_id || !Array.isArray(json.state_chunks) || !json.state_chunks.length || !Array.isArray(json.maps)) {
+    throw cloudSync_makeError({ code: 'manifestInvalid', userMessage: '云端 manifest 内容不完整。' });
+  }
+  return json;
+}
+async function cloudSync_checkMapExists({ owner, repo, token, sha256 }) {
+  const metaPath = `maps/${sha256.slice(0, 2)}/${sha256}/meta.json`;
+  try {
+    return await cloudSync_headContent({ owner, repo, token, path: metaPath });
+  } catch (_) {
+    const existing = await cloudSync_getJsonFile({ owner, repo, token, path: metaPath, allowMissing: true });
+    return Boolean(existing);
+  }
+}
+async function cloudSync_prepareStateChunks(bytes, compression = 'gzip') {
+  const rawChunks = cloudSync_chunkBytes(bytes, CLOUD_SYNC_SINGLE_LIMIT);
+  return Promise.all(rawChunks.map(async (chunk) => {
+    const base64 = cloudSync_bytesToBase64(chunk.bytes);
+    return {
+      index: chunk.index,
+      rawBytes: chunk.bytes,
+      base64,
+      sha256: await cloudSync_sha256(chunk.bytes),
+      status: 'pending',
+    };
+  }));
+}
+async function cloudSync_prepareMapChunks(mapEntry) {
+  const rawChunks = cloudSync_chunkBytes(mapEntry.bytes, CLOUD_SYNC_SINGLE_LIMIT);
+  return rawChunks.map((chunk) => ({
+    index: chunk.index,
+    rawBytes: chunk.bytes,
+    base64: cloudSync_bytesToBase64(chunk.bytes),
+    status: 'pending',
+  }));
+}
+function cloudSync_buildDraftManifest({ snapshotId, note, bundleJson, stateCompression, stateChunks, mapsPlan }) {
+  return cloudSync_buildManifest({
+    snapshotId,
+    mapsList: mapsPlan,
+    stateChunks,
+    bundleJson,
+    note,
+    compression: stateCompression,
+    parentSnapshotId: state.cloudSync.lastSnapshotId || null,
+  });
+}
+async function cloudSync_putDraftManifest({ owner, repo, token, snapshotId, manifest, sha = null }) {
+  const text = JSON.stringify(manifest, null, 2);
+  await cloudSync_putTextFile({
+    owner,
+    repo,
+    token,
+    path: cloudSync_pendingManifestPath(snapshotId),
+    text,
+    sha,
+    message: `cloud sync draft ${snapshotId}`,
+  });
+}
+async function cloudSync_uploadMapChunked({ owner, repo, token, mapEntry, controller }) {
+  const originalBytes = mapEntry.byteSize || 0;
+  const chunks = mapEntry.chunks || await cloudSync_prepareMapChunks(mapEntry);
+  for (const chunk of chunks) {
+    cloudSync_assertNotAborted(controller);
+    await cloudSync_putTextFile({
+      owner,
+      repo,
+      token,
+      path: `${cloudSync_mapBasePath(mapEntry.sha256)}/chunks/${cloudSync_chunkName(chunk.index)}`,
+      text: chunk.base64,
+      message: `cloud sync upload map chunk ${mapEntry.sha256}#${chunk.index}`,
+    });
+    chunk.status = 'uploaded';
+    await cloudSync_sleep(CLOUD_SYNC_REQUEST_GAP_MS);
+  }
+  await cloudSync_putTextFile({
+    owner,
+    repo,
+    token,
+    path: `${cloudSync_mapBasePath(mapEntry.sha256)}/meta.json`,
+    text: JSON.stringify({
+      schemaVersion: CLOUD_SYNC_SCHEMA_VERSION,
+      sha256: mapEntry.sha256,
+      mime: mapEntry.mime || mapEntry.blob.type || 'application/octet-stream',
+      originalBytes,
+      chunkCount: chunks.length,
+      downsampledW: mapEntry.mapSize?.w || null,
+      downsampledH: mapEntry.mapSize?.h || null,
+      created_at: new Date().toISOString(),
+    }, null, 2),
+    message: `cloud sync upload map meta ${mapEntry.sha256}`,
+  });
+}
+async function cloudSync_uploadStateChunks({ owner, repo, token, snapshotId, chunks, controller }) {
+  for (const chunk of chunks) {
+    cloudSync_assertNotAborted(controller);
+    await cloudSync_putTextFile({
+      owner,
+      repo,
+      token,
+      path: cloudSync_snapshotChunkPath(snapshotId, chunk.index),
+      text: chunk.base64,
+      message: `cloud sync upload state chunk ${snapshotId}#${chunk.index}`,
+    });
+    chunk.status = 'uploaded';
+    await cloudSync_sleep(CLOUD_SYNC_REQUEST_GAP_MS);
+  }
+  return chunks;
+}
+async function cloudSync_putManifest({ owner, repo, token, snapshotId, manifest }) {
+  await cloudSync_putTextFile({
+    owner,
+    repo,
+    token,
+    path: cloudSync_snapshotManifestPath(snapshotId),
+    text: JSON.stringify(manifest, null, 2),
+    message: `cloud sync put manifest ${snapshotId}`,
+  });
+}
+async function cloudSync_putLatest({ owner, repo, token, snapshotId, manifestPath }) {
+  const existing = await cloudSync_getJsonFile({
+    owner,
+    repo,
+    token,
+    path: CLOUD_SYNC_LATEST_PATH,
+    allowMissing: true,
+  });
+  const latestJson = cloudSync_buildLatestPayload(snapshotId, manifestPath);
+  try {
+    await cloudSync_putTextFile({
+      owner,
+      repo,
+      token,
+      path: CLOUD_SYNC_LATEST_PATH,
+      text: JSON.stringify(latestJson, null, 2),
+      sha: existing && existing.sha ? existing.sha : null,
+      message: `cloud sync promote latest ${snapshotId}`,
+    });
+    return { ok: true };
+  } catch (err) {
+    if (err && err.code === 'latestConflict') {
+      const remote = await cloudSync_getJsonFile({ owner, repo, token, path: CLOUD_SYNC_LATEST_PATH, allowMissing: true });
+      return { ok: false, conflict: true, remoteLatest: remote ? remote.json : null };
+    }
+    throw err;
+  }
+}
+async function cloudSync_updateDraftSha({ owner, repo, token, snapshotId, manifest, draftShaRef }) {
+  await cloudSync_putDraftManifest({ owner, repo, token, snapshotId, manifest, sha: draftShaRef.value || null });
+  const updated = await cloudSync_getJsonFile({
+    owner,
+    repo,
+    token,
+    path: cloudSync_pendingManifestPath(snapshotId),
+    allowMissing: true,
+  });
+  draftShaRef.value = updated && updated.sha ? updated.sha : draftShaRef.value;
+}
+function cloudSync_mergeMapStatus(manifest, sha256, status) {
+  for (const item of manifest.maps) {
+    if (item.map_sha256 === sha256) item.status = status;
+  }
+}
+function cloudSync_buildUniqueMapPlan(mapsList) {
+  const bySha = new Map();
+  for (const item of mapsList) {
+    let plan = bySha.get(item.sha256);
+    if (!plan) {
+      plan = {
+        sha256: item.sha256,
+        blob: item.blob,
+        bytes: item.bytes,
+        byteSize: item.byteSize,
+        mime: item.mime,
+        mapSize: item.mapSize,
+        sceneNames: [item.sceneName],
+      };
+      bySha.set(item.sha256, plan);
+    } else {
+      plan.sceneNames.push(item.sceneName);
+    }
+  }
+  return Array.from(bySha.values());
+}
+async function cloudSync_prepareUploadPlan({ snapshotId, note }) {
+  const bundleJson = await cloudSync_serializeStateBundle();
+  const bundleBytes = cloudSync_stringToBytes(JSON.stringify(bundleJson));
+  const compressedInfo = await cloudSync_compressStateBundleBytes(bundleBytes);
+  const stateChunks = await cloudSync_prepareStateChunks(compressedInfo.bytes, compressedInfo.compression);
+  const mapsList = await cloudSync_collectMapBlobs();
+  const uniqueMaps = cloudSync_buildUniqueMapPlan(mapsList);
+  for (const entry of uniqueMaps) {
+    entry.chunks = await cloudSync_prepareMapChunks(entry);
+  }
+  const manifest = cloudSync_buildDraftManifest({
+    snapshotId,
+    note,
+    bundleJson,
+    stateCompression: compressedInfo.compression,
+    stateChunks,
+    mapsPlan: mapsList,
+  });
+  return { bundleJson, stateChunks, mapsList, uniqueMaps, manifest, compression: compressedInfo.compression };
+}
+async function cloudSync_uploadPrepared({ owner, repo, token, snapshotId, note, preparedPlan, draftShaRef, controller }) {
+  const { bundleJson, stateChunks, mapsList, uniqueMaps, manifest, compression } = preparedPlan;
+  manifest.state_compression = compression;
+  state.cloudSync.draftSnapshotId = snapshotId;
+  state.cloudSync.hasPendingDraft = true;
+  let reused = 0;
+  let uploaded = 0;
+  setLoading(`检查云端已有地图... 0/${uniqueMaps.length}`, { onCancel: () => controller.abort() });
+  let checked = 0;
+  for (const entry of uniqueMaps) {
+    cloudSync_assertNotAborted(controller);
+    entry.exists = await cloudSync_checkMapExists({ owner, repo, token, sha256: entry.sha256 });
+    checked++;
+    if (entry.exists) {
+      reused++;
+      entry.status = 'reused';
+      cloudSync_mergeMapStatus(manifest, entry.sha256, 'uploaded');
+      await cloudSync_updateDraftSha({ owner, repo, token, snapshotId, manifest, draftShaRef });
+    } else {
+      entry.status = 'pending';
+    }
+    setLoading(`检查云端已有地图... ${checked}/${uniqueMaps.length}`, { onCancel: () => controller.abort() });
+    await cloudSync_sleep(CLOUD_SYNC_REQUEST_GAP_MS);
+  }
+  const uploadMaps = uniqueMaps.filter((entry) => !entry.exists);
+  for (let i = 0; i < uploadMaps.length; i++) {
+    const entry = uploadMaps[i];
+    setLoading(`上传新增地图... 第 ${i + 1}/${uploadMaps.length} 张`, { onCancel: () => controller.abort() });
+    await cloudSync_uploadMapChunked({ owner, repo, token, mapEntry: entry, controller });
+    uploaded++;
+    cloudSync_mergeMapStatus(manifest, entry.sha256, 'uploaded');
+    await cloudSync_writeCachedMap(entry.sha256, entry.blob);
+    await cloudSync_updateDraftSha({ owner, repo, token, snapshotId, manifest, draftShaRef });
+  }
+  setLoading('上传状态数据...', { onCancel: () => controller.abort() });
+  await cloudSync_uploadStateChunks({ owner, repo, token, snapshotId, chunks: stateChunks, controller });
+  manifest.state_chunks.forEach((chunk) => { chunk.status = 'uploaded'; });
+  await cloudSync_updateDraftSha({ owner, repo, token, snapshotId, manifest, draftShaRef });
+  manifest.maps_reused_count = reused;
+  manifest.maps_new_count = uploaded;
+  setLoading('写入快照清单...', { onCancel: () => controller.abort() });
+  await cloudSync_putManifest({ owner, repo, token, snapshotId, manifest });
+  setLoading('发布到最新快照...', { onCancel: () => controller.abort() });
+  const latestResult = await cloudSync_putLatest({
+    owner,
+    repo,
+    token,
+    snapshotId,
+    manifestPath: cloudSync_snapshotManifestPath(snapshotId),
+  });
+  if (latestResult && latestResult.conflict) {
+    return { ok: false, conflict: true, remoteLatest: latestResult.remoteLatest, manifest };
+  }
+  await cloudSync_deleteTree({ owner, repo, token, basePath: `${CLOUD_SYNC_PENDING_PREFIX}/${snapshotId}` });
+  state.cloudSync.lastUploadAt = new Date().toISOString();
+  state.cloudSync.lastSnapshotId = snapshotId;
+  state.cloudSync.hasPendingDraft = false;
+  state.cloudSync.draftSnapshotId = null;
+  cloudSync_clearPendingBanner();
+  hideLoading();
+  showToast(`上传完成 ✓ 复用 ${reused} 张已有地图,新上传 ${uploaded} 张`, 4200);
+  return { ok: true, reused, uploaded, manifest, bundleJson, mapsList };
+}
+function cloudSync_showConflictDialog(remoteLatest, onOverwrite, onDownloadRemote) {
+  const remoteId = remoteLatest && remoteLatest.snapshot_id ? remoteLatest.snapshot_id : '未知';
+  showModal(`
+    <div class="modal-title">云端冲突</div>
+    <div class="modal-desc">云端已有更晚的快照，自动发布被取消。你可以覆盖云端，先把云端读下来，或者直接取消。</div>
+    <div class="cloud-status-list">
+      <div class="cloud-status-row"><span>云端最新</span><span>${escapeHtml(remoteId)}</span></div>
+      <div class="cloud-status-row"><span>更新时间</span><span>${escapeHtml(cloudSync_formatTime(remoteLatest && remoteLatest.updated_at))}</span></div>
+    </div>
+    <div class="modal-actions">
+      <button id="cloud-conflict-cancel">取消</button>
+      <button id="cloud-conflict-download">先读取云端</button>
+      <button id="cloud-conflict-overwrite" class="danger">覆盖云端最新</button>
+    </div>
+  `, {
+    onMounted: () => {
+      $('cloud-conflict-cancel').onclick = closeModal;
+      $('cloud-conflict-download').onclick = () => { closeModal(); onDownloadRemote(); };
+      $('cloud-conflict-overwrite').onclick = () => { closeModal(); onOverwrite(); };
+    }
+  });
+}
+async function cloudSync_uploadCurrent({ owner, repo, token, note, snapshotId = null, preparedPlan = null }) {
+  if (state.cloudSync.tokenIsReadonly) {
+    showToast('这把钥匙只有读取权限，不能上传。');
+    return false;
+  }
+  if (state.cloudSync.busy) {
+    showToast('云存档正在忙，请稍等');
+    return false;
+  }
+  const controller = new AbortController();
+  state.cloudSync.uploadCancel = controller;
+  cloudSync_setBusy(true);
+  try {
+    const finalSnapshotId = snapshotId || cloudSync_generateSnapshotId();
+    setLoading('正在打包...', { onCancel: () => controller.abort() });
+    const plan = preparedPlan || await cloudSync_prepareUploadPlan({ snapshotId: finalSnapshotId, note });
+    const draftShaRef = { value: null };
+    await cloudSync_putDraftManifest({
+      owner,
+      repo,
+      token,
+      snapshotId: finalSnapshotId,
+      manifest: plan.manifest,
+    });
+    const draftFile = await cloudSync_getJsonFile({
+      owner,
+      repo,
+      token,
+      path: cloudSync_pendingManifestPath(finalSnapshotId),
+      allowMissing: true,
+    });
+    draftShaRef.value = draftFile && draftFile.sha ? draftFile.sha : null;
+    const result = await cloudSync_uploadPrepared({
+      owner,
+      repo,
+      token,
+      snapshotId: finalSnapshotId,
+      note,
+      preparedPlan: plan,
+      draftShaRef,
+      controller,
+    });
+    if (result.conflict) {
+      hideLoading();
+      cloudSync_showConflictDialog(
+        result.remoteLatest,
+        async () => {
+          const latest = await cloudSync_getJsonFile({ owner, repo, token, path: CLOUD_SYNC_LATEST_PATH, allowMissing: true });
+          await cloudSync_putTextFile({
+            owner,
+            repo,
+            token,
+            path: CLOUD_SYNC_LATEST_PATH,
+            text: JSON.stringify(cloudSync_buildLatestPayload(finalSnapshotId, cloudSync_snapshotManifestPath(finalSnapshotId)), null, 2),
+            sha: latest && latest.sha ? latest.sha : null,
+            message: `cloud sync force latest ${finalSnapshotId}`,
+          });
+          await cloudSync_deleteTree({ owner, repo, token, basePath: `${CLOUD_SYNC_PENDING_PREFIX}/${finalSnapshotId}` });
+          state.cloudSync.lastUploadAt = new Date().toISOString();
+          state.cloudSync.lastSnapshotId = finalSnapshotId;
+          state.cloudSync.hasPendingDraft = false;
+          state.cloudSync.draftSnapshotId = null;
+          cloudSync_clearPendingBanner();
+          showToast('已覆盖云端最新快照 ✓', 3200);
+        },
+        async () => {
+          await cloudSync_downloadLatest({ owner, repo, token });
+        }
+      );
+      return false;
+    }
+    state.cloudSync.lastError = null;
+    return true;
+  } catch (err) {
+    hideLoading();
+    const errorObject = err && err.userMessage ? err : await cloudSync_classifyError(null, err);
+    state.cloudSync.lastError = errorObject;
+    if (errorObject.code !== 'uploadCancelled') {
+      console.error('cloudSync upload failed:', errorObject);
+    }
+    showToast(errorObject.userMessage || '上传失败', 4200);
+    return false;
+  } finally {
+    cloudSync_setBusy(false);
+    state.cloudSync.uploadCancel = null;
+  }
+}
+async function cloudSync_loadSnapshotManifest({ owner, repo, token, snapshotId }) {
+  const manifestFile = await cloudSync_getJsonFile({
+    owner,
+    repo,
+    token,
+    path: cloudSync_snapshotManifestPath(snapshotId),
+  });
+  return cloudSync_parseManifest(manifestFile.json);
+}
+async function cloudSync_downloadStateBundleFromManifest({ owner, repo, token, manifest }) {
+  const ordered = [...manifest.state_chunks].sort((a, b) => a.index - b.index);
+  const chunks = [];
+  for (let i = 0; i < ordered.length; i++) {
+    const stateChunk = ordered[i];
+    setLoading(`下载状态数据... ${i + 1}/${ordered.length}`);
+    const chunkText = await cloudSync_getRawTextFile({
+      owner,
+      repo,
+      token,
+      path: `${CLOUD_SYNC_SNAPSHOTS_PREFIX}/${manifest.snapshot_id}/${stateChunk.filename}`,
+    });
+    const raw = cloudSync_base64ToBytes(chunkText);
+    const actualSha = await cloudSync_sha256(raw);
+    if (actualSha !== stateChunk.sha256) {
+      throw cloudSync_makeError({ code: 'stateChunkCorrupt', userMessage: '云端状态数据校验失败，可能已损坏。' });
+    }
+    chunks.push(raw);
+  }
+  const total = chunks.reduce((sum, item) => sum + item.length, 0);
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  const bundleBytes = await cloudSync_decompressBytes(merged, manifest.state_compression || 'gzip');
+  return JSON.parse(cloudSync_bytesToString(bundleBytes));
+}
+async function cloudSync_downloadMapBlob({ owner, repo, token, mapMeta }) {
+  let blob = await cloudSync_readCachedMap(mapMeta.map_sha256);
+  if (blob) return blob;
+  const chunkCount = mapMeta.map_chunk_count || 1;
+  const parts = [];
+  for (let i = 0; i < chunkCount; i++) {
+    const chunkText = await cloudSync_getRawTextFile({
+      owner,
+      repo,
+      token,
+      path: `${mapMeta.map_path}chunks/${cloudSync_chunkName(i)}`,
+    });
+    parts.push(cloudSync_base64ToBytes(chunkText));
+  }
+  const total = parts.reduce((sum, item) => sum + item.length, 0);
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    merged.set(part, offset);
+    offset += part.length;
+  }
+  blob = new Blob([merged], { type: mapMeta.mime || 'application/octet-stream' });
+  await cloudSync_writeCachedMap(mapMeta.map_sha256, blob);
+  return blob;
+}
+async function cloudSync_restoreSnapshot({ owner, repo, token, snapshotId }) {
+  if (state.cloudSync.busy) {
+    showToast('云存档正在忙，请稍等');
+    return false;
+  }
+  cloudSync_setBusy(true);
+  try {
+    setLoading('正在拉取快照...');
+    const manifest = await cloudSync_loadSnapshotManifest({ owner, repo, token, snapshotId });
+    const bundleJson = await cloudSync_downloadStateBundleFromManifest({ owner, repo, token, manifest });
+    const mapBlobsBySceneId = {};
+    for (let i = 0; i < manifest.maps.length; i++) {
+      const mapMeta = manifest.maps[i];
+      setLoading(`下载地图... ${i + 1}/${manifest.maps.length}`);
+      mapBlobsBySceneId[mapMeta.scene_id] = await cloudSync_downloadMapBlob({ owner, repo, token, mapMeta });
+    }
+    try {
+      state.cloudSync.localDraftBeforeOverwrite = await cloudSync_serializeStateBundle();
+    } catch (_) {
+      state.cloudSync.localDraftBeforeOverwrite = null;
+    }
+    setLoading('恢复中...');
+    await cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId);
+    await triggerImmediateSave();
+    state.cloudSync.lastSnapshotId = manifest.snapshot_id;
+    state.cloudSync.lastError = null;
+    hideLoading();
+    showToast('已读取云端进度 ✓', 3500);
+    return true;
+  } catch (err) {
+    hideLoading();
+    const errorObject = err && err.userMessage ? err : await cloudSync_classifyError(null, err);
+    state.cloudSync.lastError = errorObject;
+    console.error('cloudSync restore snapshot failed:', errorObject);
+    showToast(errorObject.userMessage || '读取失败', 4200);
+    return false;
+  } finally {
+    cloudSync_setBusy(false);
+  }
+}
+async function cloudSync_downloadLatest({ owner, repo, token }) {
+  const latest = await cloudSync_getJsonFile({ owner, repo, token, path: CLOUD_SYNC_LATEST_PATH });
+  const latestJson = latest && latest.json ? latest.json : null;
+  if (!latestJson || !latestJson.snapshot_id) {
+    throw cloudSync_makeError({ code: 'latestMissing', userMessage: '云端还没有可读取的最新进度。' });
+  }
+  return await cloudSync_restoreSnapshot({ owner, repo, token, snapshotId: latestJson.snapshot_id });
+}
+async function cloudSync_listSnapshots({ owner, repo, token }) {
+  const dirs = await cloudSync_listContents({ owner, repo, token, path: CLOUD_SYNC_SNAPSHOTS_PREFIX, allowMissing: true });
+  const manifests = [];
+  for (const entry of dirs) {
+    if (entry.type !== 'dir') continue;
+    try {
+      const manifest = await cloudSync_loadSnapshotManifest({ owner, repo, token, snapshotId: entry.name });
+      manifests.push(manifest);
+    } catch (err) {
+      console.warn('cloudSync listSnapshots skip broken snapshot:', entry.name, err);
+    }
+  }
+  manifests.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+  state.cloudSync.snapshots = manifests;
+  return manifests;
+}
+async function cloudSync_toggleLock({ owner, repo, token, snapshotId, locked }) {
+  const manifestFile = await cloudSync_getJsonFile({
+    owner,
+    repo,
+    token,
+    path: cloudSync_snapshotManifestPath(snapshotId),
+  });
+  const manifest = cloudSync_parseManifest(manifestFile.json);
+  manifest.locked = !!locked;
+  await cloudSync_putTextFile({
+    owner,
+    repo,
+    token,
+    path: cloudSync_snapshotManifestPath(snapshotId),
+    text: JSON.stringify(manifest, null, 2),
+    sha: manifestFile.sha,
+    message: `cloud sync ${locked ? 'lock' : 'unlock'} ${snapshotId}`,
+  });
+}
+async function cloudSync_detectPendingDraft({ owner, repo, token }) {
+  const dirs = await cloudSync_listContents({ owner, repo, token, path: CLOUD_SYNC_PENDING_PREFIX, allowMissing: true });
+  const draftDir = dirs.find((entry) => entry.type === 'dir');
+  if (!draftDir) {
+    state.cloudSync.hasPendingDraft = false;
+    state.cloudSync.draftSnapshotId = null;
+    cloudSync_clearPendingBanner();
+    return null;
+  }
+  state.cloudSync.hasPendingDraft = true;
+  state.cloudSync.draftSnapshotId = draftDir.name;
+  cloudSync_setPendingBanner(`检测到上次上传未完成：${draftDir.name}`, {
+    onResume: async () => { cloudSync_clearPendingBanner(); await cloudSync_resumeDraft({ owner, repo, token, snapshotId: draftDir.name }); },
+    onDiscard: async () => { await cloudSync_discardDraft({ owner, repo, token, draftSnapshotId: draftDir.name }); },
+    onClose: cloudSync_clearPendingBanner,
+  });
+  return draftDir.name;
+}
+async function cloudSync_resumeDraft({ owner, repo, token, snapshotId }) {
+  const draftFile = await cloudSync_getJsonFile({
+    owner,
+    repo,
+    token,
+    path: cloudSync_pendingManifestPath(snapshotId),
+  });
+  const draftManifest = cloudSync_parseManifest(draftFile.json);
+  const note = draftManifest.note || '';
+  const prepared = await cloudSync_prepareUploadPlan({ snapshotId, note });
+  for (const chunk of prepared.stateChunks) {
+    const saved = draftManifest.state_chunks.find((item) => item.index === chunk.index);
+    if (saved && saved.status === 'uploaded') chunk.status = 'uploaded';
+  }
+  for (const unique of prepared.uniqueMaps) {
+    const manifestMaps = draftManifest.maps.filter((item) => item.map_sha256 === unique.sha256);
+    if (manifestMaps.some((item) => item.status === 'uploaded')) {
+      unique.exists = true;
+      unique.status = 'reused';
+    }
+  }
+  prepared.manifest = draftManifest;
+  return await cloudSync_uploadCurrent({
+    owner,
+    repo,
+    token,
+    note,
+    snapshotId,
+    preparedPlan: prepared,
+  });
+}
+async function cloudSync_discardDraft({ owner, repo, token, draftSnapshotId }) {
+  await cloudSync_deleteTree({ owner, repo, token, basePath: `${CLOUD_SYNC_PENDING_PREFIX}/${draftSnapshotId}` });
+  state.cloudSync.hasPendingDraft = false;
+  state.cloudSync.draftSnapshotId = null;
+  cloudSync_clearPendingBanner();
+  showToast('已丢弃未完成上传草稿', 2600);
+}
+async function cloudSync_runGC({ owner, repo, token }) {
+  if (state.cloudSync.gcRunning) {
+    showToast('云端清理正在进行中');
+    return false;
+  }
+  state.cloudSync.gcRunning = true;
+  try {
+    setLoading('正在扫描云端快照...');
+    const snapshots = await cloudSync_listSnapshots({ owner, repo, token });
+    const mapDirsLv1 = await cloudSync_listContents({ owner, repo, token, path: CLOUD_SYNC_MAPS_PREFIX, allowMissing: true });
+    const allMapDirs = [];
+    for (const prefixDir of mapDirsLv1) {
+      if (prefixDir.type !== 'dir') continue;
+      const leaf = await cloudSync_listContents({ owner, repo, token, path: prefixDir.path, allowMissing: true });
+      for (const entry of leaf) if (entry.type === 'dir') allMapDirs.push(entry.path);
+    }
+    const keepSnapshots = snapshots.slice(0, 30);
+    const keepSnapshotIds = new Set(keepSnapshots.map((item) => item.snapshot_id));
+    const keepMaps = new Set();
+    for (const manifest of keepSnapshots) {
+      for (const map of manifest.maps || []) keepMaps.add(map.map_sha256);
+    }
+    let deletedSnapshots = 0;
+    let deletedMaps = 0;
+    for (const manifest of snapshots) {
+      if (keepSnapshotIds.has(manifest.snapshot_id) || manifest.locked) continue;
+      await cloudSync_deleteTree({ owner, repo, token, basePath: `${CLOUD_SYNC_SNAPSHOTS_PREFIX}/${manifest.snapshot_id}` });
+      deletedSnapshots++;
+    }
+    for (const path of allMapDirs) {
+      const sha = path.split('/').pop();
+      if (keepMaps.has(sha)) continue;
+      const metaFile = await cloudSync_getJsonFile({ owner, repo, token, path: `${path}/meta.json`, allowMissing: true });
+      const createdAt = metaFile && metaFile.json && metaFile.json.created_at ? Date.parse(metaFile.json.created_at) : 0;
+      if (createdAt && Date.now() - createdAt < 7 * 24 * 3600 * 1000) continue;
+      await cloudSync_deleteTree({ owner, repo, token, basePath: path });
+      deletedMaps++;
+    }
+    hideLoading();
+    showToast(`已清理 ${deletedMaps} 张孤儿地图，${deletedSnapshots} 个老快照`, 4200);
+    return true;
+  } catch (err) {
+    hideLoading();
+    const errorObject = err && err.userMessage ? err : await cloudSync_classifyError(null, err);
+    console.error('cloudSync gc failed:', errorObject);
+    showToast(errorObject.userMessage || '云端清理失败', 4200);
+    return false;
+  } finally {
+    state.cloudSync.gcRunning = false;
+  }
+}
+function openCloudSyncModal() {
+  if (state.cloudSync.status === 'connected') showCloudSyncStatusView();
+  else showCloudSyncConnectForm();
+}
+function showCloudSyncConnectForm() {
+  const error = state.cloudSync.lastError;
+  showModal(`
+    <div class="modal-title">☁ 云存档（还没连上）</div>
+    <div class="modal-desc">把这局存到你自己的 GitHub 上，换电脑也能继续</div>
+    ${error ? `<div class="cloud-error">${escapeHtml(error.userMessage || '连接失败')}</div>` : ''}
+    <div class="form-row">
+      <label for="cloud-sync-token-input">上传钥匙</label>
+      <input id="cloud-sync-token-input" type="password" autocomplete="off" placeholder="粘贴你的上传钥匙(github_pat_ 开头那串)">
+      <div class="form-note">钥匙在哪拿? 生成教程见 云同步方案.md 第十二节</div>
+    </div>
+    <div class="form-row">
+      <label class="form-check">
+        <input id="cloud-sync-trust-input" type="checkbox">
+        <span>信任这台电脑(下次打开不用再输钥匙)</span>
+      </label>
+      <div class="form-note danger">只在你自己的设备勾。朋友电脑、网吧电脑别勾。</div>
+    </div>
+    <div class="modal-actions">
+      <button id="cloud-sync-cancel">取消</button>
+      <button id="cloud-sync-connect" class="primary">连接</button>
+    </div>
+  `, {
+    onMounted: () => {
+      $('cloud-sync-cancel').addEventListener('click', closeModal);
+      $('cloud-sync-connect').addEventListener('click', onClickConnect);
+      $('cloud-sync-token-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) onClickConnect();
+      });
+      $('cloud-sync-token-input').focus();
+    }
+  });
+}
+function showCloudSyncStatusView() {
+  const lastSnapshot = state.cloudSync.lastSnapshotId ? `<div class="cloud-status-row"><span>最近快照</span><span>${escapeHtml(state.cloudSync.lastSnapshotId)}</span></div>` : '';
+  const lastUpload = state.cloudSync.lastUploadAt ? `<div class="cloud-status-row"><span>上次上传</span><span>${escapeHtml(cloudSync_formatTime(state.cloudSync.lastUploadAt))}</span></div>` : '';
+  const readonlyText = state.cloudSync.tokenIsReadonly ? '<div class="cloud-status-row"><span>钥匙权限</span><span>只读</span></div>' : '<div class="cloud-status-row"><span>钥匙权限</span><span>可读写</span></div>';
+  showModal(`
+    <div class="modal-title">☁ 云存档</div>
+    <div class="modal-desc">${state.cloudSync.tokenIsReadonly ? '这把钥匙只有读取权限，可读取历史和最新进度，但不能上传。' : '已连接到你的私有云存档仓库。可上传当前进度、读取最新进度、查看历史。'}</div>
+    <div class="cloud-status-list">
+      <div class="cloud-status-row"><span>仓库</span><span>${escapeHtml(state.cloudSync.repoOwner + '/' + state.cloudSync.repoName)}</span></div>
+      <div class="cloud-status-row"><span>上次连接</span><span>${escapeHtml(cloudSync_formatTime(state.cloudSync.lastConnectAt))}</span></div>
+      ${lastUpload}
+      ${lastSnapshot}
+      ${readonlyText}
+      <div class="cloud-status-row"><span>本机信任</span><span>${cloudSync_isTrusted() ? '已信任' : '临时钥匙'}</span></div>
+      <div class="cloud-status-row"><span>设备 ID</span><span>${escapeHtml(state.cloudSync.deviceId || '')}</span></div>
+    </div>
+    <div class="modal-actions">
+      <button id="cloud-sync-download">📥 读取云端进度</button>
+      ${state.cloudSync.tokenIsReadonly ? '' : '<button id="cloud-sync-upload" class="primary">📤 上传当前进度</button>'}
+    </div>
+    <div class="modal-actions">
+      <button id="cloud-sync-history">📜 历史进度</button>
+      ${isEditSurface() && !state.cloudSync.tokenIsReadonly ? '<button id="cloud-sync-gc">🧹 清理云端孤儿</button>' : ''}
+      ${isEditSurface() ? '<button id="cloud-sync-forget" class="danger">忘记这台电脑</button>' : ''}
+      <button id="cloud-sync-token-page">打开 GitHub 钥匙页面</button>
+      <button id="cloud-sync-close">关闭</button>
+    </div>
+  `, {
+    onMounted: () => {
+      const forget = $('cloud-sync-forget');
+      if (forget) forget.addEventListener('click', onClickForgetThisDevice);
+      $('cloud-sync-token-page').addEventListener('click', cloudSync_openPatPage);
+      $('cloud-sync-close').addEventListener('click', closeModal);
+      const uploadBtn = $('cloud-sync-upload');
+      if (uploadBtn) uploadBtn.addEventListener('click', showCloudSyncUploadForm);
+      $('cloud-sync-download').addEventListener('click', onClickDownloadLatest);
+      $('cloud-sync-history').addEventListener('click', showCloudSyncHistoryModal);
+      const gcBtn = $('cloud-sync-gc');
+      if (gcBtn) gcBtn.addEventListener('click', onClickCloudSyncGc);
+    }
+  });
+}
+async function showCloudSyncHistoryModal() {
+  setLoading('正在读取历史列表...');
+  try {
+    const snapshots = await cloudSync_listSnapshots({
+      owner: state.cloudSync.repoOwner,
+      repo: state.cloudSync.repoName,
+      token: cloudSync_getToken(),
+    });
+    hideLoading();
+    const rows = snapshots.map((item, idx) => `
+      <div class="scene-row" data-snapshot-id="${escapeHtml(item.snapshot_id)}">
+        <div style="flex:1;min-width:0;">
+          <div class="scene-name">${escapeHtml(item.created_at || item.snapshot_id)}</div>
+          <div class="scene-meta">${escapeHtml(item.device_label || item.device_id || '未知设备')} · ${item.scene_count || 0} 场景 · ${cloudSync_formatBytes(item.total_b64_bytes || 0)} · "${escapeHtml(item.note || '')}"${item.locked ? ' · 已锁定' : ''}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="snapshot-restore" data-id="${escapeHtml(item.snapshot_id)}">恢复</button>
+          ${isEditSurface() && !state.cloudSync.tokenIsReadonly ? `<button class="snapshot-lock" data-id="${escapeHtml(item.snapshot_id)}" data-locked="${item.locked ? '1' : '0'}">${item.locked ? '解锁' : '锁定'}</button>` : ''}
+        </div>
+      </div>
+    `).join('') || '<div class="modal-desc">云端还没有历史快照。</div>';
+    showModal(`
+      <div class="modal-title">📜 历史进度</div>
+      <div class="modal-desc">按时间倒序显示。恢复会覆盖当前本地进度。</div>
+      <div class="scene-list">${rows}</div>
+      <div class="modal-actions">
+        <button id="cloud-sync-history-close">关闭</button>
+      </div>
+    `, {
+      onMounted: () => {
+        $('cloud-sync-history-close').onclick = showCloudSyncStatusView;
+        document.querySelectorAll('.snapshot-restore').forEach((btn) => {
+          btn.onclick = () => showConfirm('恢复历史快照', '这会覆盖当前本地场景。确定继续?', async () => {
+            closeModal();
+            await cloudSync_restoreSnapshot({
+              owner: state.cloudSync.repoOwner,
+              repo: state.cloudSync.repoName,
+              token: cloudSync_getToken(),
+              snapshotId: btn.dataset.id,
+            });
+          }, { danger: true, yesText: '覆盖并恢复' });
+        });
+        document.querySelectorAll('.snapshot-lock').forEach((btn) => {
+          btn.onclick = async () => {
+            setLoading('正在更新锁定状态...');
+            try {
+              await cloudSync_toggleLock({
+                owner: state.cloudSync.repoOwner,
+                repo: state.cloudSync.repoName,
+                token: cloudSync_getToken(),
+                snapshotId: btn.dataset.id,
+                locked: btn.dataset.locked !== '1',
+              });
+              hideLoading();
+              showToast('锁定状态已更新', 2200);
+              await showCloudSyncHistoryModal();
+            } catch (err) {
+              hideLoading();
+              const errorObject = err && err.userMessage ? err : await cloudSync_classifyError(null, err);
+              console.error('cloudSync toggle lock failed:', errorObject);
+              showToast(errorObject.userMessage || '锁定状态更新失败', 3200);
+            }
+          };
+        });
+      }
+    });
+  } catch (err) {
+    hideLoading();
+    const errorObject = err && err.userMessage ? err : await cloudSync_classifyError(null, err);
+    console.error('cloudSync history failed:', errorObject);
+    showToast('读不到历史列表', 3200);
+  }
+}
+function showCloudSyncUploadForm() {
+  showModal(`
+    <div class="modal-title">📤 上传当前进度</div>
+    <div class="modal-desc">把当前全部场景、迷雾、Token、事件、标注和地图原图上传到你的私有仓库。超大地图和大状态会自动切包。</div>
+    <div class="form-row">
+      <label for="cloud-sync-note-input">备注</label>
+      <textarea id="cloud-sync-note-input" rows="3" placeholder="比如：阶段 2 首次上传测试"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button id="cloud-sync-upload-cancel">取消</button>
+      <button id="cloud-sync-upload-confirm" class="primary">开始上传</button>
+    </div>
+  `, {
+    onMounted: () => {
+      $('cloud-sync-upload-cancel').addEventListener('click', showCloudSyncStatusView);
+      $('cloud-sync-upload-confirm').addEventListener('click', onClickUploadCurrent);
+      $('cloud-sync-note-input').focus();
+    }
+  });
+}
+async function onClickConnect() {
+  const token = $('cloud-sync-token-input').value.trim();
+  const trusted = $('cloud-sync-trust-input').checked;
+  if (!token) { showToast('钥匙不能空'); return; }
+  setLoading('正在连接云存档…');
+  state.cloudSync.status = 'busy';
+  const result = await cloudSync_testConnection({
+    owner: state.cloudSync.repoOwner,
+    repo: state.cloudSync.repoName,
+    token,
+  });
+  if (result.ok) {
+    cloudSync_setToken(token, trusted);
+    state.cloudSync.status = 'connected';
+    state.cloudSync.lastConnectAt = new Date().toISOString();
+    state.cloudSync.tokenIsReadonly = !!result.tokenIsReadonly;
+    state.cloudSync.lastError = null;
+    hideLoading();
+    showToast('已连上你的云存档保险柜 ✓');
+    cloudSync_detectPendingDraft({
+      owner: state.cloudSync.repoOwner,
+      repo: state.cloudSync.repoName,
+      token,
+    }).catch((err) => console.warn('cloudSync detectPendingDraft failed:', err));
+    showCloudSyncStatusView();
+    return;
+  }
+  const errorObject = result.error || { code: 'unknown', userMessage: '云存档连接失败。' };
+  state.cloudSync.status = 'error';
+  state.cloudSync.lastError = errorObject;
+  hideLoading();
+  showToast(errorObject.userMessage, 3800);
+  console.error('cloudSync connect failed:', errorObject);
+  showCloudSyncConnectForm();
+}
+async function onClickUploadCurrent() {
+  const note = ($('cloud-sync-note-input')?.value || '').trim();
+  closeModal();
+  await cloudSync_uploadCurrent({
+    owner: state.cloudSync.repoOwner,
+    repo: state.cloudSync.repoName,
+    token: cloudSync_getToken(),
+    note,
+  });
+}
+function onClickDownloadLatest() {
+  showConfirm('读取云端进度', '这会用云端最新快照覆盖本机当前场景。开始前会先在内存里备份当前本地进度。确定继续?', async () => {
+    closeModal();
+    try {
+      await cloudSync_downloadLatest({
+        owner: state.cloudSync.repoOwner,
+        repo: state.cloudSync.repoName,
+        token: cloudSync_getToken(),
+      });
+    } catch (err) {
+      const errorObject = err && err.userMessage ? err : await cloudSync_classifyError(null, err);
+      console.error('cloudSync download latest failed:', errorObject);
+      showToast(errorObject.userMessage || '读取失败', 3200);
+    }
+  }, { danger: true, yesText: '覆盖并读取' });
+}
+function onClickCloudSyncGc() {
+  showConfirm('清理云端孤儿', '会清理不再被保留快照引用的老快照和孤儿地图。锁定快照不会删除。确定继续?', async () => {
+    closeModal();
+    await cloudSync_runGC({
+      owner: state.cloudSync.repoOwner,
+      repo: state.cloudSync.repoName,
+      token: cloudSync_getToken(),
+    });
+  }, { danger: true, yesText: '开始清理' });
+}
+function onClickForgetThisDevice() {
+  showConfirm('忘记这台电脑', '忘记后再上传需要重新输钥匙。确定?', () => {
+    cloudSync_clearToken();
+    state.cloudSync.status = 'disconnected';
+    state.cloudSync.lastError = null;
+    state.cloudSync.lastSnapshotId = null;
+    closeModal();
+    showToast('这台电脑已经不记得你的钥匙了');
+  }, { danger: true, yesText: '确认忘记' });
+}
+function cloudSync_bootstrap() {
+  state.cloudSync.deviceId = cloudSync_getDeviceId();
+  state.cloudSync.deviceLabel = cloudSync_getDeviceLabel();
+  const token = cloudSync_getToken();
+  if (!token) {
+    state.cloudSync.status = 'disconnected';
+    return;
+  }
+  state.cloudSync.status = 'busy';
+  cloudSync_testConnection({
+    owner: state.cloudSync.repoOwner,
+    repo: state.cloudSync.repoName,
+    token,
+  }).then((result) => {
+    if (result.ok) {
+      state.cloudSync.status = 'connected';
+      state.cloudSync.lastConnectAt = new Date().toISOString();
+      state.cloudSync.tokenIsReadonly = !!result.tokenIsReadonly;
+      state.cloudSync.lastError = null;
+      console.info('cloudSync bootstrap connected:', state.cloudSync.repoOwner + '/' + state.cloudSync.repoName);
+      cloudSync_detectPendingDraft({
+        owner: state.cloudSync.repoOwner,
+        repo: state.cloudSync.repoName,
+        token,
+      }).catch((err) => console.warn('cloudSync detectPendingDraft failed:', err));
+      return;
+    }
+    state.cloudSync.status = 'error';
+    state.cloudSync.lastError = result.error || { code: 'unknown', userMessage: '云存档连接失败。' };
+    console.warn('cloudSync bootstrap failed:', state.cloudSync.lastError);
+  }).catch((err) => {
+    state.cloudSync.status = 'error';
+    state.cloudSync.lastError = { code: 'network', userMessage: '连不上 GitHub。检查一下网络再试。', raw: err };
+    console.warn('cloudSync bootstrap failed:', err);
+  });
+}
 
 // ============== 加载 Token 弹窗 ==============
 function openTokenUploadDialog(file, existingId) {
@@ -6762,6 +8320,12 @@ function showDropdown() {
   const btn = $('btn-more');
   const rect = btn.getBoundingClientRect();
   menu.innerHTML = '';
+  const cloudBtn = mkMenuItem('☁ 云存档');
+  cloudBtn.id = 'btn-more-cloud-sync';
+  cloudBtn.addEventListener('click', () => { hideDropdown(); openCloudSyncModal(); });
+  menu.appendChild(cloudBtn);
+  appendMenuDivider(menu);
+
   const layerLabel = state.currentLayer === 'terrain' ? '地形层' : '事件层';
   if (isEditSurface()) {
     const opacityRow = document.createElement('div');
@@ -7075,6 +8639,7 @@ async function init() {
   updateAnnotationsStatus();
   updateZoomStatus();
   updateSceneStatus();
+  cloudSync_bootstrap();
 
   // v3: 启动时尝试自动加载 currentScene（如果它有 mapBlob）
   await tryAutoLoadCurrentScene();
