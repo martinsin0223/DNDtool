@@ -787,7 +787,7 @@ input[type="number"] {
 <input id="file-input-token" class="hidden-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp">
 <input id="file-input-annotation-image" class="hidden-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp">
 <input id="file-input-event-icon" class="hidden-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp">
-<input id="file-input-import" class="hidden-input" type="file" accept=".json,application/json">
+<input id="file-input-import" class="hidden-input" type="file" accept=".json,.fogsave,.fogbundle,application/json">
 
 <script>
 'use strict';
@@ -883,7 +883,7 @@ const state = {
   // v3.1 网格遮罩（per-scene）
   grid: {
     enabled: false,
-    type: 'hex',        // 'hex' | 'square'（v3.1 仅 hex 实现完整，square 占位）
+    type: 'hex',        // 'hex' | 'square'
     cellSize: 80,       // 地图坐标
     offsetX: 0,
     offsetY: 0,
@@ -956,12 +956,26 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
 const lerp = (a, b, t) => a + (b - a) * t;
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2) + Date.now());
+function normalizeGridType(type) {
+  return type === 'square' ? 'square' : 'hex';
+}
+function gridRotationLimit(type) {
+  return normalizeGridType(type) === 'square' ? 45 : 30;
+}
+function gridRotationPeriod(type) {
+  return normalizeGridType(type) === 'square' ? 90 : 60;
+}
 function normalizeGridRotation(v) {
+  return normalizeGridRotationForType('hex', v);
+}
+function normalizeGridRotationForType(type, v) {
   const raw = Number(v) || 0;
+  const period = gridRotationPeriod(type);
+  const limit = period / 2;
   let n = raw;
-  n = ((n % 60) + 60) % 60;
-  if (n > 30) n -= 60;
-  if (n === 30 && raw < 0) n = -30;
+  n = ((n % period) + period) % period;
+  if (n > limit) n -= period;
+  if (n === limit && raw < 0) n = -limit;
   return Math.round(n * 10) / 10;
 }
 
@@ -1012,6 +1026,71 @@ function hexPath(ctx, cx, cy, size, rotation = 0) {
   ctx.moveTo(v[0][0], v[0][1]);
   for (let i = 1; i < 6; i++) ctx.lineTo(v[i][0], v[i][1]);
   ctx.closePath();
+}
+
+// ============== 通用网格几何（hex / square） ==============
+// square：offset 表示网格线交点原点，cellSize 表示方格边长。
+function squareCenter(col, row, size, ox, oy, rotation = 0) {
+  const x = ox + (col + 0.5) * size;
+  const y = oy + (row + 0.5) * size;
+  return rotateAroundOrigin(x, y, ox, oy, rotation * Math.PI / 180);
+}
+function squareAtPoint(x, y, size, ox, oy, rotation = 0) {
+  const [ux, uy] = rotateAroundOrigin(x, y, ox, oy, -rotation * Math.PI / 180);
+  return {
+    col: Math.floor((ux - ox) / size),
+    row: Math.floor((uy - oy) / size),
+  };
+}
+function squareVertices(col, row, size, ox, oy, rotation = 0) {
+  const x = ox + col * size;
+  const y = oy + row * size;
+  const corners = [[x, y], [x + size, y], [x + size, y + size], [x, y + size]];
+  const rad = rotation * Math.PI / 180;
+  return corners.map(([px, py]) => rotateAroundOrigin(px, py, ox, oy, rad));
+}
+function pathFromVertices(ctx, verts) {
+  ctx.beginPath();
+  ctx.moveTo(verts[0][0], verts[0][1]);
+  for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i][0], verts[i][1]);
+  ctx.closePath();
+}
+function gridCellAtPoint(mx, my, grid) {
+  const type = normalizeGridType(grid.type);
+  const rotation = normalizeGridRotationForType(type, grid.rotation || 0);
+  if (type === 'square') {
+    const p = squareAtPoint(mx, my, grid.cellSize, grid.offsetX, grid.offsetY, rotation);
+    return { type, col: p.col, row: p.row };
+  }
+  const p = hexAtPoint(mx, my, grid.cellSize, grid.offsetX, grid.offsetY, rotation);
+  return { type, q: p.q, r: p.r };
+}
+function gridCellCenter(cell, grid) {
+  const type = normalizeGridType(grid.type);
+  const rotation = normalizeGridRotationForType(type, grid.rotation || 0);
+  if (type === 'square') return squareCenter(cell.col, cell.row, grid.cellSize, grid.offsetX, grid.offsetY, rotation);
+  return hexCenter(cell.q, cell.r, grid.cellSize, grid.offsetX, grid.offsetY, rotation);
+}
+function gridCellVertices(cell, grid) {
+  const type = normalizeGridType(grid.type);
+  const rotation = normalizeGridRotationForType(type, grid.rotation || 0);
+  if (type === 'square') return squareVertices(cell.col, cell.row, grid.cellSize, grid.offsetX, grid.offsetY, rotation);
+  const [cx, cy] = hexCenter(cell.q, cell.r, grid.cellSize, grid.offsetX, grid.offsetY, rotation);
+  return hexVertices(cx, cy, grid.cellSize, rotation);
+}
+function gridCellPath(ctx, cell, grid) {
+  pathFromVertices(ctx, gridCellVertices(cell, grid));
+}
+function gridCellBounds(cell, grid) {
+  const verts = gridCellVertices(cell, grid);
+  const xs = verts.map((v) => v[0]);
+  const ys = verts.map((v) => v[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+function gridCellKey(cell) {
+  return cell.type === 'square' ? `square:${cell.col},${cell.row}` : `hex:${cell.q},${cell.r}`;
 }
 
 function showToast(msg, ms = 2200) {
@@ -1381,6 +1460,11 @@ function triggerImmediateSave() {
   });
   return state.saveQueue;
 }
+async function saveMainStrict() {
+  await ensureDb();
+  await state.saveQueue;
+  await doSaveMain();
+}
 function triggerDebouncedSave() {
   clearTimeout(state.debouncedSaveTimer);
   state.debouncedSaveTimer = setTimeout(triggerImmediateSave, 500);
@@ -1441,21 +1525,28 @@ async function serializeActiveSceneData() {
   };
 }
 
+async function syncActiveSceneToMemory() {
+  if (!state.hasMap || !state.currentSceneId) return false;
+  const sceneCore = await serializeActiveSceneData();
+  if (!sceneCore) return false;
+  const prev = state.scenes[state.currentSceneId] || {};
+  state.scenes[state.currentSceneId] = {
+    ...sceneCore,
+    mapBlob: prev.mapBlob || null,
+    name: prev.name || '场景 1',
+    createdAt: prev.createdAt || Date.now(),
+    lastUsedAt: Date.now(),
+  };
+  return true;
+}
+
 async function doSaveMain() {
   if (!state.dbReady) return;
   if (!state.currentSceneId) return;  // 没场景就不写
   if (state.hasMap) {
     // 把当前 active state 写到 state.scenes[currentSceneId]
-    const sceneCore = await serializeActiveSceneData();
-    if (!sceneCore) return;
-    const prev = state.scenes[state.currentSceneId] || {};
-    state.scenes[state.currentSceneId] = {
-      ...sceneCore,
-      mapBlob: prev.mapBlob || null,
-      name: prev.name || '场景 1',
-      createdAt: prev.createdAt || Date.now(),
-      lastUsedAt: Date.now(),
-    };
+    const ok = await syncActiveSceneToMemory();
+    if (!ok) return;
   }
   const isDefault = state.theme === DEFAULT_DARK_THEME;
   const main = {
@@ -1508,8 +1599,11 @@ async function clearCheckpoints() {
 }
 
 // ============== 导出 / 导入项目 ==============
-// 不含地图本身（用户自己传地图文件）。schemaVersion 2。
+// 不含地图本身（用户自己传地图文件）。
+// schemaVersion 2 = 旧单场景 fogsave（只保留导入兼容）
+// schemaVersion 3 = 全部场景 fogbundle（当前主流程）
 const EXPORT_SCHEMA_VERSION = 2;
+const BUNDLE_EXPORT_SCHEMA_VERSION = 3;
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
@@ -1528,73 +1622,77 @@ async function base64ToBlob(dataUrl) {
   return await res.blob();
 }
 
+async function serializeSceneForBundle(sceneId, scene) {
+  if (!scene || !scene.fogLayers?.terrain?.blob || !scene.fogLayers?.event?.blob) {
+    throw new Error(`场景"${scene?.name || sceneId || '未命名'}"缺少迷雾数据，无法导出全部场景`);
+  }
+  const [terrainB64, eventFogB64] = await Promise.all([
+    blobToBase64(scene.fogLayers.terrain.blob),
+    blobToBase64(scene.fogLayers.event.blob),
+  ]);
+  const tokensExported = await Promise.all((scene.tokens || []).map(async (t) => ({
+    id: t.id,
+    blob: await blobToBase64(t.blob),
+    shape: t.shape, borderColor: t.borderColor, borderPattern: t.borderPattern,
+    name: t.name, x: t.x, y: t.y, size: t.size, zOrder: t.zOrder,
+  })));
+  const eventsExported = await Promise.all((scene.events || []).map(async (ev) => {
+    const icon = ev.icon || { type: 'emoji', value: '❓' };
+    const iconSer = icon.type === 'image'
+      ? { type: 'image', blob: await blobToBase64(icon.blob) }
+      : (icon.type === 'svg-symbol'
+         ? { type: 'svg-symbol', symbolId: icon.symbolId }
+         : { type: 'emoji', value: icon.value });
+    return {
+      id: ev.id, x: ev.x, y: ev.y, icon: iconSer,
+      title: ev.title, content: ev.content, size: ev.size, zOrder: ev.zOrder,
+      layer: (ev.layer === 0 ? 0 : 1),
+    };
+  }));
+  const annotationsExported = await Promise.all((scene.annotations || []).map(async (ann) => {
+    const ser = serializeAnnotation(ann);
+    if (ser.type === 'image') ser.blob = await blobToBase64(ann.blob);
+    return ser;
+  }));
+  return {
+    sceneId,
+    name: scene.name || '场景',
+    createdAt: scene.createdAt || null,
+    lastUsedAt: scene.lastUsedAt || scene.ts || null,
+    mapFingerprint: scene.mapFingerprint || null,
+    mapSize: scene.mapSize || null,
+    fogLayers: { terrain: { base64: terrainB64 }, event: { base64: eventFogB64 } },
+    tokens: tokensExported,
+    events: eventsExported,
+    annotations: annotationsExported,
+    view: scene.view || null,
+    settings: scene.settings || {},
+  };
+}
+
 async function exportProject() {
   if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
   if (!state.hasMap) { showToast('请先加载地图'); return; }
-  setLoading('正在打包项目…');
+  setLoading('正在打包全部场景…');
   try {
-    // fog 两层
-    const [terrainBlob, eventFogBlob] = await Promise.all([
-      canvasToBlob(state.fogLayers.terrain.canvas),
-      canvasToBlob(state.fogLayers.event.canvas),
-    ]);
-    const [terrainB64, eventFogB64] = await Promise.all([
-      blobToBase64(terrainBlob),
-      blobToBase64(eventFogBlob),
-    ]);
-    // tokens
-    const tokensExported = await Promise.all(state.tokens.map(async (t) => ({
-      id: t.id,
-      blob: await blobToBase64(t.blob),
-      shape: t.shape, borderColor: t.borderColor, borderPattern: t.borderPattern,
-      name: t.name, x: t.x, y: t.y, size: t.size, zOrder: t.zOrder,
-    })));
-    // events
-    const eventsExported = await Promise.all(state.events.map(async (ev) => {
-      const iconSer = ev.icon.type === 'image'
-        ? { type: 'image', blob: await blobToBase64(ev.icon.blob) }
-        : (ev.icon.type === 'svg-symbol'
-           ? { type: 'svg-symbol', symbolId: ev.icon.symbolId }
-           : { type: 'emoji', value: ev.icon.value });
-      return {
-        id: ev.id, x: ev.x, y: ev.y, icon: iconSer,
-        title: ev.title, content: ev.content, size: ev.size, zOrder: ev.zOrder,
-        layer: (ev.layer === 0 ? 0 : 1),
-      };
-    }));
-    // annotations
-    const annotationsExported = await Promise.all(state.annotations.map(async (ann) => {
-      const ser = serializeAnnotation(ann);
-      if (ser.type === 'image') ser.blob = await blobToBase64(ann.blob);
-      return ser;
-    }));
+    await syncActiveSceneToMemory();
+    const sceneEntries = Object.entries(state.scenes || {});
+    const scenes = [];
+    for (const [sceneId, scene] of sceneEntries) {
+      const packed = await serializeSceneForBundle(sceneId, scene);
+      scenes.push(packed);
+    }
+    if (!scenes.length) throw new Error('没有可导出的场景');
     // 主题：仅在非默认时导出
     const isDefaultTheme = state.theme === DEFAULT_DARK_THEME;
     const payload = {
-      format: 'fog-of-war-map.fogsave',
-      schemaVersion: EXPORT_SCHEMA_VERSION,
-      appVersion: 'v3.5.0',
+      format: 'fog-of-war-map.fogbundle',
+      schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
+      appVersion: 'v3.6.0',
       exportedAt: new Date().toISOString(),
-      sceneName: state.scenes[state.currentSceneId]?.name || '场景',
-      sceneId: state.currentSceneId,
-      mapFingerprint: state.mapFingerprint,
-      mapSize: { w: state.mapCanvas.width, h: state.mapCanvas.height },
-      fogLayers: { terrain: { base64: terrainB64 }, event: { base64: eventFogB64 } },
-      tokens: tokensExported,
-      events: eventsExported,
-      annotations: annotationsExported,
-      view: { ...state.view },
-      settings: {
-        brushSize: state.brush.sizeScreen,
-        brushMode: state.brush.mode,
-        currentLayer: state.currentLayer,
-        fogOpacity: state.fogOpacity,
-        terrainFogOpacity: state.terrainFogOpacity,
-        eventFogOpacity: state.eventFogOpacity,
-        terrainFogColor: state.terrainFogColor,
-        eventFogColor: state.eventFogColor,
-        grid: { ...state.grid },
-      },
+      sceneCount: scenes.length,
+      currentSceneId: state.currentSceneId,
+      scenes,
       themeId: 'default-dark',
       customTheme: isDefaultTheme ? null : state.theme,
     };
@@ -1604,14 +1702,14 @@ async function exportProject() {
     const a = document.createElement('a');
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     a.href = url;
-    a.download = `战争迷雾-${ts}.fogsave.json`;
+    a.download = `战争迷雾-全部场景-${ts}.fogbundle.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     hideLoading();
     const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
-    showToast(`已导出 ${a.download}（${sizeMB} MB）`, 3500);
+    showToast(`已导出 ${scenes.length} 个场景（${sizeMB} MB）`, 3500);
   } catch (e) {
     hideLoading();
     console.error(e);
@@ -1619,13 +1717,158 @@ async function exportProject() {
   }
 }
 
+function mapFingerprintForPreparedFile(file, prepared) {
+  return `${file.name}-${file.size}-${file.lastModified || 0}-${prepared.w}x${prepared.h}`;
+}
+
+async function bundleScenePayloadToSaved(scenePayload) {
+  if (!scenePayload?.fogLayers?.terrain?.base64 || !scenePayload?.fogLayers?.event?.base64) {
+    throw new Error(`场景"${scenePayload?.name || '未命名'}" fog 数据缺失`);
+  }
+  const terrainBlob = await base64ToBlob(scenePayload.fogLayers.terrain.base64);
+  const eventFogBlob = await base64ToBlob(scenePayload.fogLayers.event.base64);
+  if (!terrainBlob || !eventFogBlob) throw new Error(`场景"${scenePayload.name || '未命名'}" fog 数据解码失败`);
+  const tokens = await Promise.all((scenePayload.tokens || []).map(async (t) => ({
+    ...t,
+    blob: await base64ToBlob(t.blob),
+  })));
+  const events = await Promise.all((scenePayload.events || []).map(async (ev) => {
+    const icon = ev.icon || { type: 'emoji', value: '❓' };
+    let restoredIcon = icon;
+    if (icon.type === 'image') restoredIcon = { type: 'image', blob: await base64ToBlob(icon.blob) };
+    return { ...ev, icon: restoredIcon };
+  }));
+  const annotations = await Promise.all((scenePayload.annotations || []).map(async (ann) => {
+    if (ann.type === 'image') return { ...ann, blob: await base64ToBlob(ann.blob) };
+    return ann;
+  }));
+  return {
+    version: 2,
+    fogLayers: {
+      terrain: { blob: terrainBlob },
+      event: { blob: eventFogBlob },
+    },
+    mapSize: scenePayload.mapSize || null,
+    tokens,
+    events,
+    annotations,
+    view: scenePayload.view || null,
+    settings: scenePayload.settings || {},
+    mapFingerprint: scenePayload.mapFingerprint || null,
+    ts: Date.now(),
+  };
+}
+
+function openSceneBundleImportWizard(payload) {
+  const scenes = Array.isArray(payload.scenes) ? payload.scenes : [];
+  if (!scenes.length) {
+    showConfirm('场景包为空', '这个场景包没有可导入的场景。', closeModal);
+    return;
+  }
+  const rows = scenes.map((s, i) => {
+    const size = s.mapSize ? `${s.mapSize.w}×${s.mapSize.h}` : '未知尺寸';
+    const name = escapeHtml(s.name || `场景 ${i + 1}`);
+    return `
+      <div class="scene-row" data-bundle-scene="${i}">
+        <div style="flex:1;min-width:0;">
+          <div class="scene-name">${name}</div>
+          <div class="scene-meta">地图 ${escapeHtml(size)} · 选择本机地图，不选则跳过</div>
+        </div>
+        <input class="bundle-map-input" data-index="${i}" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" style="max-width:210px;">
+      </div>
+    `;
+  }).join('');
+  showModal(`
+    <div class="modal-title">导入全部场景</div>
+    <div class="modal-desc">导出文件不包含地图原图。请为要导入的场景选择本机地图；尺寸必须与该场景迷雾一致。未选择地图的场景会跳过。</div>
+    <div class="scene-list">${rows}</div>
+    <div class="modal-actions">
+      <button id="bundle-import-cancel">取消</button>
+      <button id="bundle-import-confirm" class="primary">导入已选择场景</button>
+    </div>
+  `, {
+    onMounted: () => {
+      const selectedFiles = new Array(scenes.length).fill(null);
+      document.querySelectorAll('.bundle-map-input').forEach((input) => {
+        input.addEventListener('change', (e) => {
+          const idx = Number(e.target.dataset.index);
+          selectedFiles[idx] = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+        });
+      });
+      $('bundle-import-cancel').addEventListener('click', closeModal);
+      $('bundle-import-confirm').addEventListener('click', () => {
+        if (!selectedFiles.some(Boolean)) {
+          showToast('请至少为一个场景选择地图');
+          return;
+        }
+        closeModal();
+        doImportSceneBundle(payload, selectedFiles);
+      });
+    }
+  });
+}
+
+async function doImportSceneBundle(payload, selectedFiles) {
+  setLoading('正在导入场景包…');
+  const scenes = Array.isArray(payload.scenes) ? payload.scenes : [];
+  const preparedEntries = [];
+  try {
+    await syncActiveSceneToMemory();
+    for (let i = 0; i < scenes.length; i++) {
+      const file = selectedFiles[i];
+      if (!file) continue;
+      const scenePayload = scenes[i];
+      const preparedMap = await prepareMapFromBlob(file, { showDownsampleToast: true });
+      if (scenePayload.mapSize && (scenePayload.mapSize.w !== preparedMap.w || scenePayload.mapSize.h !== preparedMap.h)) {
+        throw new Error(`场景"${scenePayload.name || i + 1}"地图尺寸不匹配：需要 ${scenePayload.mapSize.w}×${scenePayload.mapSize.h}，当前 ${preparedMap.w}×${preparedMap.h}`);
+      }
+      const saved = await bundleScenePayloadToSaved(scenePayload);
+      const pair = await decodeAndValidateFogPair(saved, { w: preparedMap.w, h: preparedMap.h });
+      if (pair.terrainBmp && typeof pair.terrainBmp.close === 'function') pair.terrainBmp.close();
+      if (pair.eventFogBmp && typeof pair.eventFogBmp.close === 'function') pair.eventFogBmp.close();
+      const newId = uuid();
+      const mapFingerprint = mapFingerprintForPreparedFile(file, preparedMap);
+      preparedEntries.push({
+        newId,
+        preparedMap,
+        scene: {
+          ...saved,
+          mapBlob: file,
+          mapFingerprint,
+          mapSize: { w: preparedMap.w, h: preparedMap.h },
+          name: scenePayload.name || `导入场景 ${preparedEntries.length + 1}`,
+          createdAt: Date.now(),
+          lastUsedAt: Date.now(),
+          importedFromSceneId: scenePayload.sceneId || null,
+        },
+      });
+    }
+    if (!preparedEntries.length) throw new Error('没有选择可导入的场景');
+    const first = preparedEntries[0];
+    const firstPreparedRestore = await prepareSavedRestore(first.scene, first.scene.mapSize);
+    for (const entry of preparedEntries) {
+      state.scenes[entry.newId] = entry.scene;
+    }
+    state.currentSceneId = first.newId;
+    state.mapFingerprint = first.scene.mapFingerprint;
+    commitPreparedMap(first.preparedMap);
+    applyPreparedRestore(firstPreparedRestore, { fitViewAfterRestore: true });
+    if (payload.customTheme) {
+      try { loadCustomTheme(payload.customTheme); } catch (e) { console.warn('导入主题失败', e); }
+    }
+    await saveMainStrict();
+    hideLoading();
+    showToast(`已导入 ${preparedEntries.length} 个场景`, 3500);
+  } catch (e) {
+    hideLoading();
+    console.error(e);
+    showToast('导入失败：' + (e.message || e), 4200);
+  }
+}
+
 async function importProject(file) {
   if (!file) return;
   if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
-  if (!state.hasMap) {
-    showConfirm('请先加载地图', '导入前需要先加载对应的地图图片（导出文件不含地图）。', closeModal);
-    return;
-  }
   setLoading('正在解析导入文件…');
   let payload;
   try {
@@ -1634,6 +1877,15 @@ async function importProject(file) {
   } catch (e) {
     hideLoading();
     showConfirm('文件解析失败', 'JSON 格式错误或文件损坏。', closeModal);
+    return;
+  }
+  if (payload && payload.format === 'fog-of-war-map.fogbundle') {
+    hideLoading();
+    if (!payload.schemaVersion || payload.schemaVersion > BUNDLE_EXPORT_SCHEMA_VERSION) {
+      showConfirm('版本不兼容', `导入文件 schemaVersion=${payload.schemaVersion}，本工具仅支持 ≤ ${BUNDLE_EXPORT_SCHEMA_VERSION}。请升级工具。`, closeModal);
+      return;
+    }
+    openSceneBundleImportWizard(payload);
     return;
   }
   // schema 校验
@@ -1645,6 +1897,11 @@ async function importProject(file) {
   if (!payload.schemaVersion || payload.schemaVersion > EXPORT_SCHEMA_VERSION) {
     hideLoading();
     showConfirm('版本不兼容', `导入文件 schemaVersion=${payload.schemaVersion}，本工具仅支持 ≤ ${EXPORT_SCHEMA_VERSION}。请升级工具。`, closeModal);
+    return;
+  }
+  if (!state.hasMap) {
+    hideLoading();
+    showConfirm('请先加载地图', '旧版单场景导入需要先加载对应的地图图片。新版“全部场景”导入会在向导中逐个选择地图。', closeModal);
     return;
   }
   // fog 尺寸校验（底线，不允许尺寸不一致；旧导出缺 mapSize 时由实际 fog bitmap 兜底）
@@ -1897,19 +2154,24 @@ function openSceneManagerModal() {
 
 // ============== 网格设置 modal（v3.1） ==============
 function openGridSettingsModal() {
+  state.grid = normalizeGridSettings(state.grid);
   const g = state.grid;
+  const gridType = normalizeGridType(g.type);
+  const rotLimit = gridRotationLimit(gridType);
+  const sizeLabel = gridType === 'square' ? '方格边长（地图像素）' : '六边形边长（中心到顶点，地图像素）';
   showModal(`
     <div class="modal-title">网格设置</div>
     <div class="modal-desc">网格模式下，笔刷按整格揭示/覆盖（适合 D&D 战棋）。关闭后回到自由像素笔刷。</div>
     <div class="form-row">
       <label>网格模式</label>
       <div class="shape-options">
-        <button class="option-btn" data-grid-en="0">关闭（自由像素笔刷）</button>
-        <button class="option-btn" data-grid-en="1">六边形</button>
+        <button class="option-btn" data-grid-type="off">关闭（自由像素笔刷）</button>
+        <button class="option-btn" data-grid-type="hex">六边形</button>
+        <button class="option-btn" data-grid-type="square">方格</button>
       </div>
     </div>
     <div class="form-row">
-      <label>边长（中心到顶点，地图像素）：<span id="grid-cellsize-val">${g.cellSize}</span></label>
+      <label><span id="grid-size-label">${sizeLabel}</span>：<span id="grid-cellsize-val">${g.cellSize}</span></label>
       <input id="grid-cellsize" type="range" min="20" max="240" value="${g.cellSize}">
     </div>
     <div class="form-row" style="display:flex;gap:8px;">
@@ -1924,7 +2186,7 @@ function openGridSettingsModal() {
     </div>
     <div class="form-row">
       <label>旋转角度：<span id="grid-rotation-val">${formatGridNumber(g.rotation || 0)}°</span></label>
-      <input id="grid-rotation" type="range" min="-30" max="30" step="0.5" value="${normalizeGridRotation(g.rotation || 0)}">
+      <input id="grid-rotation" type="range" min="${-rotLimit}" max="${rotLimit}" step="0.5" value="${normalizeGridRotationForType(gridType, g.rotation || 0)}">
     </div>
     <div class="form-row">
       <label>网格线颜色 / 不透明度：<span id="grid-op-val">${Math.round(g.lineOpacity * 100)}%</span></label>
@@ -1939,13 +2201,37 @@ function openGridSettingsModal() {
     </div>
   `, {
     onMounted: () => {
-      const btns = document.querySelectorAll('.option-btn[data-grid-en]');
+      const updateGridControls = () => {
+        const type = normalizeGridType(state.grid.type);
+        const limit = gridRotationLimit(type);
+        const sizeLabelEl = $('grid-size-label');
+        if (sizeLabelEl) sizeLabelEl.textContent = type === 'square' ? '方格边长（地图像素）' : '六边形边长（中心到顶点，地图像素）';
+        const rot = $('grid-rotation');
+        if (rot) {
+          rot.min = String(-limit);
+          rot.max = String(limit);
+          state.grid.rotation = normalizeGridRotationForType(type, state.grid.rotation || 0);
+          rot.value = String(state.grid.rotation);
+        }
+        const rotVal = $('grid-rotation-val');
+        if (rotVal) rotVal.textContent = formatGridNumber(state.grid.rotation || 0) + '°';
+      };
+      const btns = document.querySelectorAll('.option-btn[data-grid-type]');
       btns.forEach((b) => {
-        if (Number(b.dataset.gridEn) === (g.enabled ? 1 : 0)) b.classList.add('selected');
+        const isSelected = !g.enabled ? b.dataset.gridType === 'off' : b.dataset.gridType === gridType;
+        if (isSelected) b.classList.add('selected');
         b.addEventListener('click', () => {
           btns.forEach((x) => x.classList.remove('selected'));
           b.classList.add('selected');
-          state.grid.enabled = (b.dataset.gridEn === '1');
+          if (b.dataset.gridType === 'off') {
+            state.grid.enabled = false;
+          } else {
+            state.grid.enabled = true;
+            state.grid.type = normalizeGridType(b.dataset.gridType);
+            state.grid.rotation = normalizeGridRotationForType(state.grid.type, state.grid.rotation || 0);
+          }
+          updateGridControls();
+          invalidateGridCache();
           scheduleRender('all');
           triggerDebouncedSave();
         });
@@ -1967,7 +2253,7 @@ function openGridSettingsModal() {
         triggerDebouncedSave();
       });
       $('grid-rotation').addEventListener('input', (e) => {
-        state.grid.rotation = normalizeGridRotation(e.target.value);
+        state.grid.rotation = normalizeGridRotationForType(state.grid.type, e.target.value);
         $('grid-rotation-val').textContent = formatGridNumber(state.grid.rotation) + '°';
         invalidateGridCache();
         scheduleRender('all');
@@ -1986,6 +2272,7 @@ function openGridSettingsModal() {
         scheduleRender('all');
         triggerDebouncedSave();
       });
+      updateGridControls();
       $('grid-calibrate').addEventListener('click', () => {
         closeModal();
         startGridCalibration();
@@ -1996,16 +2283,7 @@ function openGridSettingsModal() {
 }
 
 function cloneGridSettings(grid) {
-  return {
-    enabled: !!grid.enabled,
-    type: grid.type || 'hex',
-    cellSize: grid.cellSize || 80,
-    offsetX: grid.offsetX || 0,
-    offsetY: grid.offsetY || 0,
-    rotation: normalizeGridRotation(grid.rotation || 0),
-    lineColor: grid.lineColor || '#ffffff',
-    lineOpacity: (grid.lineOpacity != null) ? grid.lineOpacity : 0.25,
-  };
+  return normalizeGridSettings(grid);
 }
 
 function startGridCalibration() {
@@ -2034,6 +2312,8 @@ function startGridCalibration() {
   };
   state.uiMode = 'grid-calibration';
   state.grid.enabled = true;
+  state.grid.type = normalizeGridType(state.grid.type);
+  state.grid.rotation = normalizeGridRotationForType(state.grid.type, state.grid.rotation || 0);
   invalidateGridCache();
   renderGridCalibrationPanel();
   scheduleRender('all');
@@ -2047,15 +2327,18 @@ function renderGridCalibrationPanel() {
     panel.id = 'grid-calibration-panel';
     $('canvas-container').appendChild(panel);
   }
+  const gridType = normalizeGridType(state.grid.type);
+  const rotLimit = gridRotationLimit(gridType);
+  const sizeLabel = gridType === 'square' ? '方格边长' : '六边形边长';
   panel.innerHTML = `
     <div class="panel-title">网格校准</div>
     <div class="panel-row">
-      <label for="grid-calibration-size">边长 <span id="grid-calibration-size-val">${Math.round(state.grid.cellSize)}</span></label>
+      <label for="grid-calibration-size">${sizeLabel} <span id="grid-calibration-size-val">${Math.round(state.grid.cellSize)}</span></label>
       <input id="grid-calibration-size" type="range" min="20" max="240" value="${Math.round(state.grid.cellSize)}">
     </div>
     <div class="panel-row">
       <label for="grid-calibration-rotation">旋转 <span id="grid-calibration-rotation-val">${formatGridNumber(state.grid.rotation || 0)}°</span></label>
-      <input id="grid-calibration-rotation" type="range" min="-30" max="30" step="0.5" value="${normalizeGridRotation(state.grid.rotation || 0)}">
+      <input id="grid-calibration-rotation" type="range" min="${-rotLimit}" max="${rotLimit}" step="0.5" value="${normalizeGridRotationForType(gridType, state.grid.rotation || 0)}">
     </div>
     <div class="panel-meta" id="grid-calibration-meta">X ${formatGridNumber(state.grid.offsetX)} / Y ${formatGridNumber(state.grid.offsetY)} / 旋转 ${formatGridNumber(state.grid.rotation || 0)}°</div>
     <div class="panel-actions">
@@ -2070,7 +2353,7 @@ function renderGridCalibrationPanel() {
     scheduleRender('all');
   });
   $('grid-calibration-rotation').addEventListener('input', (e) => {
-    state.grid.rotation = normalizeGridRotation(e.target.value);
+    state.grid.rotation = normalizeGridRotationForType(state.grid.type, e.target.value);
     updateGridCalibrationPanel();
     invalidateGridCache();
     scheduleRender('all');
@@ -2089,7 +2372,7 @@ function updateGridCalibrationPanel() {
   const rotationVal = $('grid-calibration-rotation-val');
   if (rotationVal) rotationVal.textContent = formatGridNumber(state.grid.rotation || 0) + '°';
   const rotationInput = $('grid-calibration-rotation');
-  const rotationValue = String(normalizeGridRotation(state.grid.rotation || 0));
+  const rotationValue = String(normalizeGridRotationForType(state.grid.type, state.grid.rotation || 0));
   if (rotationInput && rotationValue !== rotationInput.value) {
     rotationInput.value = rotationValue;
   }
@@ -2099,6 +2382,33 @@ function updateGridCalibrationPanel() {
 
 function formatGridNumber(v) {
   return (Math.round((v || 0) * 10) / 10).toString();
+}
+
+function defaultGridSettings() {
+  return { enabled: false, type: 'hex', cellSize: 80, offsetX: 0, offsetY: 0, rotation: 0, lineColor: '#ffffff', lineOpacity: 0.25 };
+}
+
+function normalizeGridSettings(grid) {
+  if (!grid) return defaultGridSettings();
+  const type = normalizeGridType(grid.type);
+  const cellSize = clamp(Math.round(Number(grid.cellSize) || 80), 20, 240);
+  const rawOffsetX = Number(grid.offsetX);
+  const rawOffsetY = Number(grid.offsetY);
+  const offsetLimit = Math.max(100000, (state.mapCanvas.width || 0) * 4, (state.mapCanvas.height || 0) * 4);
+  const offsetX = Number.isFinite(rawOffsetX) ? clamp(rawOffsetX, -offsetLimit, offsetLimit) : 0;
+  const offsetY = Number.isFinite(rawOffsetY) ? clamp(rawOffsetY, -offsetLimit, offsetLimit) : 0;
+  const rawOpacity = Number(grid.lineOpacity != null ? grid.lineOpacity : 0.25);
+  const lineOpacity = Number.isFinite(rawOpacity) ? clamp(rawOpacity, 0, 1) : 0.25;
+  return {
+    enabled: !!grid.enabled,
+    type,
+    cellSize,
+    offsetX,
+    offsetY,
+    rotation: normalizeGridRotationForType(type, grid.rotation || 0),
+    lineColor: normalizeHex(grid.lineColor || '#ffffff'),
+    lineOpacity,
+  };
 }
 
 function finishGridCalibration(save) {
@@ -2445,24 +2755,17 @@ function drawBrushPreview() {
 
   let previewRadius;  // 用于文字标签定位
   if (state.grid && state.grid.enabled) {
-    // hex 模式：画当前指向格子的六边形轮廓
+    // 网格模式：画当前指向格子的轮廓（hex / square）
     const [mx, my] = screenToMap(state.cursorScreenX, state.cursorScreenY);
-    const { q, r } = hexAtPoint(mx, my, state.grid.cellSize, state.grid.offsetX, state.grid.offsetY, state.grid.rotation || 0);
-    const [hcx, hcy] = hexCenter(q, r, state.grid.cellSize, state.grid.offsetX, state.grid.offsetY, state.grid.rotation || 0);
-    const [scx, scy] = mapToScreen(hcx, hcy);
-    const sSize = state.grid.cellSize * state.view.scale;
-    // 屏幕坐标画 hex
+    const cell = gridCellAtPoint(mx, my, state.grid);
+    const verts = gridCellVertices(cell, state.grid).map(([vx, vy]) => mapToScreen(vx, vy));
     ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const ang = Math.PI / 180 * (60 * i - 30 + (state.grid.rotation || 0));
-      const px = scx + sSize * Math.cos(ang);
-      const py = scy + sSize * Math.sin(ang);
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
+    ctx.moveTo(verts[0][0], verts[0][1]);
+    for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i][0], verts[i][1]);
     ctx.closePath();
     ctx.stroke();
-    previewRadius = sSize;
+    const [ccx, ccy] = mapToScreen(...gridCellCenter(cell, state.grid));
+    previewRadius = Math.max(...verts.map(([vx, vy]) => Math.hypot(vx - ccx, vy - ccy)));
   } else {
     const r = state.brush.sizeScreen / 2;
     ctx.beginPath();
@@ -2586,7 +2889,7 @@ function paintBrushAt(sx, sy) {
   if (!state.activeStroke) return;
   if (!state.hasMap) return;
   // v3.1: 网格模式分流
-  if (state.grid && state.grid.enabled) return paintHexAt(sx, sy);
+  if (state.grid && state.grid.enabled) return paintGridCellAt(sx, sy);
   const layerKeys = getStrokeLayerKeys(state.activeStroke);
   const rScreen = state.brush.sizeScreen / 2;
   let rMap = rScreen / state.view.scale;
@@ -2635,22 +2938,21 @@ function interpolatePaintBrush(prevX, prevY, currX, currY) {
   }
 }
 
-// 网格模式：按 hex 揭示/覆盖（整格填充，保留 alpha 揭示）
-function paintHexAt(sx, sy) {
+// 网格模式：按整格揭示/覆盖（hex / square）
+function paintGridCellAt(sx, sy) {
   const layerKeys = getStrokeLayerKeys(state.activeStroke);
   const g = state.grid;
   const [mx, my] = screenToMap(sx, sy);
-  const { q, r } = hexAtPoint(mx, my, g.cellSize, g.offsetX, g.offsetY, g.rotation || 0);
-  const last = state.activeStroke.lastHex;
-  if (last && last.q === q && last.r === r) return;  // 同格不重画
-  state.activeStroke.lastHex = { q, r };
-  const [cx, cy] = hexCenter(q, r, g.cellSize, g.offsetX, g.offsetY, g.rotation || 0);
-  // 中心在地图外则跳过
-  if (cx < -g.cellSize || cx > state.mapCanvas.width + g.cellSize) return;
-  if (cy < -g.cellSize || cy > state.mapCanvas.height + g.cellSize) return;
-  // 抓 tile（hex 外接矩形）
-  const minX = cx - g.cellSize, maxX = cx + g.cellSize;
-  const minY = cy - g.cellSize, maxY = cy + g.cellSize;
+  const cell = gridCellAtPoint(mx, my, g);
+  const cellKey = gridCellKey(cell);
+  if (state.activeStroke.lastGridCell === cellKey) return;  // 同格不重画
+  state.activeStroke.lastGridCell = cellKey;
+  const bounds = gridCellBounds(cell, g);
+  const minX = bounds.x, maxX = bounds.x + bounds.w;
+  const minY = bounds.y, maxY = bounds.y + bounds.h;
+  if (maxX < 0 || minX > state.mapCanvas.width) return;
+  if (maxY < 0 || minY > state.mapCanvas.height) return;
+  // 抓 tile（格子外接矩形）
   const minTx = Math.max(0, Math.floor(minX / TILE_SIZE));
   const maxTx = Math.min(Math.floor((state.mapCanvas.width - 1) / TILE_SIZE), Math.floor(maxX / TILE_SIZE));
   const minTy = Math.max(0, Math.floor(minY / TILE_SIZE));
@@ -2668,7 +2970,7 @@ function paintHexAt(sx, sy) {
   for (const layerKey of layerKeys) {
     const ctx = state.fogLayers[layerKey].ctx;
     ctx.save();
-    hexPath(ctx, cx, cy, g.cellSize, g.rotation || 0);
+    gridCellPath(ctx, cell, g);
     if (state.activeStroke.mode === 'reveal' || state.activeStroke.mode === 'reveal-all') {
       ctx.globalCompositeOperation = 'destination-out';
       ctx.fillStyle = '#000';
@@ -2685,11 +2987,12 @@ function paintHexAt(sx, sy) {
   scheduleRender(dirty);
 }
 
-// 网格线渲染（地图坐标系下叠加；用 offscreen 缓存避免每帧重画上千 hex）
+// 网格线渲染（地图坐标系下叠加；用 offscreen 缓存避免每帧重画上千格）
 function getGridCache(mw, mh) {
   const g = state.grid;
-  const rotation = normalizeGridRotation(g.rotation || 0);
-  const key = `${g.cellSize}|${g.offsetX}|${g.offsetY}|${rotation}|${g.lineColor}|${g.lineOpacity}|${mw}|${mh}`;
+  const type = normalizeGridType(g.type);
+  const rotation = normalizeGridRotationForType(type, g.rotation || 0);
+  const key = `${type}|${g.cellSize}|${g.offsetX}|${g.offsetY}|${rotation}|${g.lineColor}|${g.lineOpacity}|${mw}|${mh}`;
   if (state._gridCache && state._gridCache.key === key) return state._gridCache.canvas;
   const cv = document.createElement('canvas');
   cv.width = mw; cv.height = mh;
@@ -2707,17 +3010,45 @@ function getGridCache(mw, mh) {
   const ys = unrotatedCorners.map((p) => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const rMin = Math.floor((minY - g.offsetY) / (g.cellSize * 1.5)) - 2;
-  const rMax = Math.ceil((maxY - g.offsetY) / (g.cellSize * 1.5)) + 2;
-  const qMin = Math.floor((minX - g.offsetX) / (g.cellSize * SQRT3) - rMax / 2) - 2;
-  const qMax = Math.ceil((maxX - g.offsetX) / (g.cellSize * SQRT3) - rMin / 2) + 2;
-  for (let r = rMin; r <= rMax; r++) {
-    for (let q = qMin; q <= qMax; q++) {
-      const [hx, hy] = hexCenter(q, r, g.cellSize, g.offsetX, g.offsetY, rotation);
-      if (hx < -g.cellSize || hx > mw + g.cellSize) continue;
-      if (hy < -g.cellSize || hy > mh + g.cellSize) continue;
-      hexPath(cx, hx, hy, g.cellSize, rotation);
+  if (type === 'square') {
+    const colMin = Math.floor((minX - g.offsetX) / g.cellSize) - 2;
+    const colMax = Math.ceil((maxX - g.offsetX) / g.cellSize) + 2;
+    const rowMin = Math.floor((minY - g.offsetY) / g.cellSize) - 2;
+    const rowMax = Math.ceil((maxY - g.offsetY) / g.cellSize) + 2;
+    const rad = rotation * Math.PI / 180;
+    const drawLine = (x1, y1, x2, y2) => {
+      const a = rotateAroundOrigin(x1, y1, g.offsetX, g.offsetY, rad);
+      const b = rotateAroundOrigin(x2, y2, g.offsetX, g.offsetY, rad);
+      cx.beginPath();
+      cx.moveTo(a[0], a[1]);
+      cx.lineTo(b[0], b[1]);
       cx.stroke();
+    };
+    const y1 = g.offsetY + rowMin * g.cellSize;
+    const y2 = g.offsetY + (rowMax + 1) * g.cellSize;
+    const x1 = g.offsetX + colMin * g.cellSize;
+    const x2 = g.offsetX + (colMax + 1) * g.cellSize;
+    for (let col = colMin; col <= colMax + 1; col++) {
+      const x = g.offsetX + col * g.cellSize;
+      drawLine(x, y1, x, y2);
+    }
+    for (let row = rowMin; row <= rowMax + 1; row++) {
+      const y = g.offsetY + row * g.cellSize;
+      drawLine(x1, y, x2, y);
+    }
+  } else {
+    const rMin = Math.floor((minY - g.offsetY) / (g.cellSize * 1.5)) - 2;
+    const rMax = Math.ceil((maxY - g.offsetY) / (g.cellSize * 1.5)) + 2;
+    const qMin = Math.floor((minX - g.offsetX) / (g.cellSize * SQRT3) - rMax / 2) - 2;
+    const qMax = Math.ceil((maxX - g.offsetX) / (g.cellSize * SQRT3) - rMin / 2) + 2;
+    for (let r = rMin; r <= rMax; r++) {
+      for (let q = qMin; q <= qMax; q++) {
+        const [hx, hy] = hexCenter(q, r, g.cellSize, g.offsetX, g.offsetY, rotation);
+        if (hx < -g.cellSize || hx > mw + g.cellSize) continue;
+        if (hy < -g.cellSize || hy > mh + g.cellSize) continue;
+        gridCellPath(cx, { type: 'hex', q, r }, g);
+        cx.stroke();
+      }
     }
   }
   state._gridCache = { canvas: cv, key };
@@ -2739,7 +3070,7 @@ function onStrokeStart(layer, mode) {
     affectedTiles: new Map(),
     bounds: null,
     startedAt: performance.now(),
-    lastHex: null,  // v3.1: hex 模式追踪上次操作的格子
+    lastGridCell: null,  // 网格模式追踪上次操作的格子
   };
 }
 
@@ -4063,7 +4394,7 @@ function onWheel(e) {
   const factor = e.deltaY > 0 ? 0.9 : 1.1;
   if (state.gridCalibration) {
     if (e.shiftKey) {
-      state.grid.rotation = normalizeGridRotation((state.grid.rotation || 0) + (e.deltaY > 0 ? -0.5 : 0.5));
+      state.grid.rotation = normalizeGridRotationForType(state.grid.type, (state.grid.rotation || 0) + (e.deltaY > 0 ? -0.5 : 0.5));
     } else {
       state.grid.cellSize = clamp(Math.round(state.grid.cellSize * factor), 20, 240);
     }
@@ -4330,6 +4661,121 @@ function showConfirm(title, desc, onYes, opts) {
   });
 }
 
+async function validateSceneFogForPreparedMap(scene, w, h) {
+  const pair = await decodeAndValidateFogPair(scene, { w, h });
+  if (pair.terrainBmp && typeof pair.terrainBmp.close === 'function') pair.terrainBmp.close();
+  if (pair.eventFogBmp && typeof pair.eventFogBmp.close === 'function') pair.eventFogBmp.close();
+}
+
+async function restoreSceneWithPreparedMap(sceneId, file, preparedMap, nextFingerprint, w, h) {
+  const scene = state.scenes[sceneId];
+  if (!scene) { showToast('场景不存在'); return; }
+  try {
+    const preparedRestore = await prepareSavedRestore(scene, { w, h });
+    commitPreparedMap(preparedMap);
+    state.mapFingerprint = nextFingerprint;
+    scene.mapBlob = file;
+    scene.mapSize = { w, h };
+    state.currentSceneId = sceneId;
+    const restored = await restoreFromSaved(scene, { preparedRestore });
+    if (restored) {
+      await loadCheckpoints();
+      setupBrushSizeFromState();
+    }
+  } catch (e) {
+    console.error(e);
+    hideLoading();
+    showToast('恢复失败：' + (e.message || e));
+  }
+}
+
+function resetSceneWithPreparedMap(sceneId, file, preparedMap, nextFingerprint, w, h) {
+  const scene = state.scenes[sceneId];
+  if (!scene) { showToast('场景不存在'); return; }
+  commitPreparedMap(preparedMap);
+  state.mapFingerprint = nextFingerprint;
+  scene.mapBlob = file;
+  scene.mapSize = { w, h };
+  state.currentSceneId = sceneId;
+  clearAnnotationRuntimeResources();
+  state.tokens = []; state.events = []; state.annotations = [];
+  state.selectedTokenId = null; state.selectedEventId = null; state.selectedAnnotationId = null;
+  state.undoStack = [];
+  updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton();
+  updateTokenActionBar(); updateAnnotationActionBar();
+  fitView();
+  setupBrushSizeFromState();
+  promptInitialFog();
+}
+
+function createSceneWithPreparedMap(file, preparedMap, nextFingerprint, w, h) {
+  commitPreparedMap(preparedMap);
+  hideLoading();
+  state.mapFingerprint = nextFingerprint;
+  const newId = uuid();
+  state.scenes[newId] = {
+    version: 2,
+    name: `场景 ${Object.keys(state.scenes).length + 1}`,
+    mapBlob: file,
+    mapFingerprint: nextFingerprint,
+    mapSize: { w, h },
+    createdAt: Date.now(),
+    lastUsedAt: Date.now(),
+  };
+  state.currentSceneId = newId;
+  clearAnnotationRuntimeResources();
+  state.tokens = []; state.events = []; state.annotations = [];
+  state.selectedTokenId = null; state.selectedEventId = null; state.selectedAnnotationId = null;
+  state.undoStack = [];
+  state.grid = defaultGridSettings();
+  updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton();
+  updateTokenActionBar(); updateAnnotationActionBar();
+  promptInitialFog();
+}
+
+function showMatchedSceneChooser(matchedSceneIds, file, preparedMap, nextFingerprint, w, h) {
+  const rows = matchedSceneIds
+    .sort((a, b) => ((state.scenes[b]?.lastUsedAt || 0) - (state.scenes[a]?.lastUsedAt || 0)))
+    .map((id) => {
+      const s = state.scenes[id] || {};
+      const ago = s.lastUsedAt ? Math.max(1, Math.round((Date.now() - s.lastUsedAt) / 60000)) + ' 分钟前' : '未知时间';
+      return `
+        <div class="scene-row">
+          <span class="scene-name">${escapeHtml(s.name || '场景')}</span>
+          <span class="scene-meta">${escapeHtml(ago)}</span>
+          <div class="scene-actions"><button class="matched-scene-restore" data-id="${escapeHtml(id)}">恢复</button></div>
+        </div>
+      `;
+    }).join('');
+  hideLoading();
+  showModal(`
+    <div class="modal-title">选择要恢复的场景</div>
+    <div class="modal-desc">这张地图对应多个场景。请选择要恢复的场景，或把它作为新场景加载。</div>
+    <div class="scene-list">${rows}</div>
+    <div class="modal-actions">
+      <button id="matched-scene-new">作为新场景加载</button>
+      <button id="matched-scene-cancel" class="primary">取消</button>
+    </div>
+  `, {
+    onMounted: () => {
+      document.querySelectorAll('.matched-scene-restore').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          closeModal();
+          await restoreSceneWithPreparedMap(id, file, preparedMap, nextFingerprint, w, h);
+        });
+      });
+      $('matched-scene-new').addEventListener('click', () => {
+        closeModal();
+        createSceneWithPreparedMap(file, preparedMap, nextFingerprint, w, h);
+        fitView();
+        setupBrushSizeFromState();
+      });
+      $('matched-scene-cancel').addEventListener('click', closeModal);
+    }
+  });
+}
+
 // ============== 加载地图 ==============
 async function loadMapFile(file) {
   await ensureDb();
@@ -4363,20 +4809,29 @@ async function loadMapFile(file) {
       const w = preparedMap.w, h = preparedMap.h;
       const nextFingerprint = `${file.name}-${file.size}-${file.lastModified || 0}-${w}x${h}`;
 
-      // v3: 在已有 scenes 中查匹配 fingerprint
-      let matchedSceneId = null;
+      // v3: 在已有 scenes 中查匹配 fingerprint；同一地图可能对应多个场景，不能静默取第一个。
+      const matchedSceneIds = [];
       for (const id in state.scenes) {
         if (state.scenes[id].mapFingerprint === nextFingerprint) {
-          matchedSceneId = id;
-          break;
+          matchedSceneIds.push(id);
         }
       }
-      if (matchedSceneId) {
+      if (matchedSceneIds.length > 1) {
+        for (const id of matchedSceneIds) {
+          try {
+            await validateSceneFogForPreparedMap(state.scenes[id], w, h);
+          } catch (e) {
+            hideLoading();
+            showToast('恢复失败：' + e.message);
+            return;
+          }
+        }
+        showMatchedSceneChooser(matchedSceneIds, file, preparedMap, nextFingerprint, w, h);
+      } else if (matchedSceneIds.length === 1) {
+        const matchedSceneId = matchedSceneIds[0];
         const scene = state.scenes[matchedSceneId];
         try {
-          const pair = await decodeAndValidateFogPair(scene, { w, h });
-          if (pair.terrainBmp && typeof pair.terrainBmp.close === 'function') pair.terrainBmp.close();
-          if (pair.eventFogBmp && typeof pair.eventFogBmp.close === 'function') pair.eventFogBmp.close();
+          await validateSceneFogForPreparedMap(scene, w, h);
         } catch (e) {
           hideLoading();
           showToast('恢复失败：' + e.message);
@@ -4387,71 +4842,14 @@ async function loadMapFile(file) {
         showConfirm(
           '检测到上次进度',
           `场景"${scene.name || '场景'}"，上次保存约 ${ago} 分钟前。是否恢复？`,
-          async () => {
-            try {
-              const preparedRestore = await prepareSavedRestore(scene, { w, h });
-              commitPreparedMap(preparedMap);
-              state.mapFingerprint = nextFingerprint;
-              scene.mapBlob = file;  // 防 v2 迁移过来的 scene mapBlob 为 null
-              scene.mapSize = { w, h };
-              state.currentSceneId = matchedSceneId;
-              const restored = await restoreFromSaved(scene, { preparedRestore });
-              if (restored) {
-                await loadCheckpoints();
-                setupBrushSizeFromState();
-              }
-            } catch (e) {
-              console.error(e);
-              hideLoading();
-              showToast('恢复失败：' + (e.message || e));
-            }
-          },
+          () => restoreSceneWithPreparedMap(matchedSceneId, file, preparedMap, nextFingerprint, w, h),
           {
             yesText: '恢复', noText: '新建（清除此场景）',
-            onNo: async () => {
-              commitPreparedMap(preparedMap);
-              state.mapFingerprint = nextFingerprint;
-              scene.mapBlob = file;
-              scene.mapSize = { w, h };
-              state.currentSceneId = matchedSceneId;
-              // 重置该场景的 fog/tokens/events/annotations 但保留 mapBlob
-              clearAnnotationRuntimeResources();
-              state.tokens = []; state.events = []; state.annotations = [];
-              state.selectedTokenId = null; state.selectedEventId = null; state.selectedAnnotationId = null;
-              state.undoStack = [];
-              updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton();
-              updateTokenActionBar(); updateAnnotationActionBar();
-              fitView();
-              setupBrushSizeFromState();
-              promptInitialFog();
-            },
+            onNo: () => resetSceneWithPreparedMap(matchedSceneId, file, preparedMap, nextFingerprint, w, h),
           }
         );
       } else {
-        commitPreparedMap(preparedMap);
-        hideLoading();
-        state.mapFingerprint = nextFingerprint;
-        // 新场景
-        const newId = uuid();
-        state.scenes[newId] = {
-          version: 2,
-          name: `场景 ${Object.keys(state.scenes).length + 1}`,
-          mapBlob: file,
-          mapFingerprint: nextFingerprint,
-          mapSize: { w, h },
-          createdAt: Date.now(),
-          lastUsedAt: Date.now(),
-        };
-        state.currentSceneId = newId;
-        clearAnnotationRuntimeResources();
-        state.tokens = []; state.events = []; state.annotations = [];
-        state.selectedTokenId = null; state.selectedEventId = null; state.selectedAnnotationId = null;
-        state.undoStack = [];
-        // v3.1: 新场景重置 grid，避免沿用上个场景的 grid 开关
-        state.grid = { enabled: false, type: 'hex', cellSize: 80, offsetX: 0, offsetY: 0, rotation: 0, lineColor: '#ffffff', lineOpacity: 0.25 };
-        updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton();
-        updateTokenActionBar(); updateAnnotationActionBar();
-        promptInitialFog();
+        createSceneWithPreparedMap(file, preparedMap, nextFingerprint, w, h);
       }
       fitView();
       setupBrushSizeFromState();
@@ -4488,7 +4886,7 @@ function promptInitialFog() {
 }
 
 function normalizeRestoredSettings(settings) {
-  if (!settings) return null;
+  if (!settings) settings = {};
   const fogOpacity = (settings.fogOpacity != null) ? settings.fogOpacity : 1.0;
   return {
     brushSize: settings.brushSize || BRUSH_DEFAULT,
@@ -4499,16 +4897,7 @@ function normalizeRestoredSettings(settings) {
     eventFogOpacity: (settings.eventFogOpacity != null) ? settings.eventFogOpacity : fogOpacity,
     terrainFogColor: normalizeHex(settings.terrainFogColor || '#000000'),
     eventFogColor: normalizeHex(settings.eventFogColor || '#000000'),
-    grid: settings.grid ? {
-      enabled: !!settings.grid.enabled,
-      type: settings.grid.type || 'hex',
-      cellSize: settings.grid.cellSize || 80,
-      offsetX: settings.grid.offsetX || 0,
-      offsetY: settings.grid.offsetY || 0,
-      rotation: normalizeGridRotation(settings.grid.rotation || 0),
-      lineColor: settings.grid.lineColor || '#ffffff',
-      lineOpacity: (settings.grid.lineOpacity != null) ? settings.grid.lineOpacity : 0.25,
-    } : { enabled: false, type: 'hex', cellSize: 80, offsetX: 0, offsetY: 0, rotation: 0, lineColor: '#ffffff', lineOpacity: 0.25 },
+    grid: normalizeGridSettings(settings.grid),
   };
 }
 
@@ -5160,11 +5549,11 @@ function showDropdown() {
   menu.appendChild(sceneBtn);
 
   appendMenuDivider(menu);
-  const expBtn = mkMenuItem('📤 导出当前场景（不含地图）');
+  const expBtn = mkMenuItem('📤 导出全部场景（不含地图）');
   expBtn.addEventListener('click', () => { hideDropdown(); exportProject(); });
   menu.appendChild(expBtn);
 
-  const impBtn = mkMenuItem('📥 导入场景到当前地图');
+  const impBtn = mkMenuItem('📥 导入场景包 / 旧场景');
   impBtn.addEventListener('click', () => { hideDropdown(); $('file-input-import').click(); });
   menu.appendChild(impBtn);
 
@@ -5536,7 +5925,7 @@ function setupEventListeners() {
     e.target.value = '';
   });
 
-  // 导入项目（.fogsave.json）
+  // 导入项目（.fogbundle.json / 旧 .fogsave.json）
   $('file-input-import').addEventListener('change', (e) => {
     const f = e.target.files[0];
     if (f) importProject(f);
