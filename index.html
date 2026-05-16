@@ -104,6 +104,15 @@ button.icon { padding: 6px 10px; }
   display: flex; align-items: center; gap: 6px;
 }
 .toolbar-label { font-size: 12px; color: var(--theme-text-muted); }
+#btn-surface-toggle {
+  border-color: color-mix(in srgb, var(--theme-accent) 60%, var(--theme-border));
+}
+#app.surface-edit #btn-surface-toggle {
+  background: var(--theme-accent);
+  border-color: var(--theme-accent);
+  color: #fff;
+}
+#app.surface-live [data-surface="edit"] { display: none; }
 
 /* ============== Canvas 区 ============== */
 #canvas-container {
@@ -227,6 +236,116 @@ button.icon { padding: 6px 10px; }
 #token-action-bar button,
 #annotation-action-bar button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
 
+/* ============== 编辑态对象侧栏 ============== */
+#object-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(340px, calc(100vw - 24px));
+  background: color-mix(in srgb, var(--theme-bg-panel) 94%, transparent);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-radius-md);
+  box-shadow: var(--theme-shadow-spread) var(--theme-shadow-color);
+  backdrop-filter: blur(8px);
+  z-index: 12;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+#app.surface-edit:not(.present-mode) #object-panel { display: flex; }
+.object-panel-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--theme-bg-input);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.object-panel-title { font-weight: 600; }
+.object-panel-meta {
+  color: var(--theme-text-muted);
+  font-size: 12px;
+}
+.object-panel-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+.object-section-title {
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  padding: 8px 4px 5px;
+}
+.object-row {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--theme-text);
+  border-radius: var(--theme-radius-sm);
+  min-height: 48px;
+  padding: 6px 6px;
+  margin-bottom: 4px;
+  display: grid;
+  grid-template-columns: 34px 1fr 34px;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+}
+.object-row:hover { background: var(--theme-bg-input); }
+.object-row.selected {
+  border-color: var(--theme-accent);
+  background: color-mix(in srgb, var(--theme-accent) 22%, transparent);
+}
+.object-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--theme-radius-sm);
+  background: var(--theme-bg-input);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 17px;
+}
+.object-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.object-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.object-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.object-sub {
+  color: var(--theme-text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.object-locate {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: var(--theme-radius-sm);
+}
+.object-empty {
+  color: var(--theme-text-muted);
+  font-size: 13px;
+  padding: 18px 8px;
+  text-align: center;
+}
+
 /* ============== 事件小卡片 ============== */
 #event-card {
   position: absolute;
@@ -325,6 +444,7 @@ button.icon { padding: 6px 10px; }
 #app.present-mode #present-handle { display: flex; }
 #app.present-mode #top-hover-zone { display: block; }
 #app.present-mode .event-card-actions { display: none; }
+#app.surface-live .event-card-actions { display: none; }
 
 /* 演示模式下，若 placeEventMode 开着，status-bar 仅显示放置事件提示（其它段隐藏） */
 #app.present-mode.placing-event #status-bar {
@@ -709,9 +829,21 @@ input[type="number"] {
   .toolbar-label { display: none; }
   #toolbar { padding: 6px; gap: 4px; }
   #toolbar button { padding: 6px 8px; font-size: 13px; }
+  #object-panel {
+    width: min(320px, calc(100vw - 16px));
+    right: 8px;
+    top: 8px;
+    bottom: 8px;
+  }
 }
 @media (max-width: 720px) {
   #toolbar .label-only { display: none; }
+  #object-panel {
+    top: auto;
+    left: 8px;
+    width: auto;
+    height: min(48vh, 360px);
+  }
 }
 </style>
 </head>
@@ -719,13 +851,13 @@ input[type="number"] {
 <div id="app">
   <div id="toolbar">
     <div class="toolbar-group">
-      <button id="btn-load-map" title="加载地图图片">📁 <span class="label-only">加载地图</span></button>
-      <button id="btn-load-token" title="添加 Token（玩家小队/NPC）">➕ <span class="label-only">Token</span></button>
-      <button id="btn-place-event" title="添加事件（Shift+点击地图也可）">🎯 <span class="label-only">事件</span></button>
-      <button id="btn-add-text" title="添加文字标注">文 <span class="label-only">文字</span></button>
-      <button id="btn-add-image" title="添加图片标注">🖼 <span class="label-only">图片</span></button>
+      <button id="btn-load-map" data-surface="edit" title="加载地图图片">📁 <span class="label-only">加载地图</span></button>
+      <button id="btn-load-token" data-surface="edit" title="添加 Token（玩家小队/NPC）">➕ <span class="label-only">Token</span></button>
+      <button id="btn-place-event" data-surface="edit" title="添加事件（Shift+点击地图也可）">🎯 <span class="label-only">事件</span></button>
+      <button id="btn-add-text" data-surface="edit" title="添加文字标注">文 <span class="label-only">文字</span></button>
+      <button id="btn-add-image" data-surface="edit" title="添加图片标注">🖼 <span class="label-only">图片</span></button>
     </div>
-    <div class="toolbar-divider"></div>
+    <div class="toolbar-divider" data-surface="edit"></div>
     <div class="toolbar-group">
       <span class="toolbar-label">层</span>
       <button id="btn-layer-terrain" class="active" title="操作地形层">地形</button>
@@ -748,6 +880,7 @@ input[type="number"] {
     <div class="toolbar-divider"></div>
     <button id="btn-undo" title="撤销 (Ctrl+Z)" disabled>↶ <span class="label-only">撤销</span></button>
     <div class="toolbar-divider"></div>
+    <button id="btn-surface-toggle" title="切换跑团/编辑">编辑</button>
     <button id="btn-present" title="演示模式 (F)">👁 <span class="label-only">演示</span></button>
     <button id="btn-more" title="更多">⋯</button>
   </div>
@@ -764,6 +897,7 @@ input[type="number"] {
     </div>
     <div id="token-action-bar"></div>
     <div id="annotation-action-bar"></div>
+    <aside id="object-panel" aria-label="对象列表"></aside>
     <div id="event-card"></div>
     <div id="top-hover-zone"></div>
     <div id="present-handle" title="退出演示">⚙</div>
@@ -911,6 +1045,7 @@ const state = {
   lastCheckpointAt: 0,
   // UI 模式
   uiMode: 'normal',
+  surfaceMode: 'live',
   presentMode: false,
   toolbarPeekTimer: null,
   // Pointer 状态
@@ -1114,6 +1249,230 @@ function mapToScreen(mx, my) {
 function screenToMap(sx, sy) {
   return [(sx - state.view.x) / state.view.scale, (sy - state.view.y) / state.view.scale];
 }
+
+function isEditSurface() { return state.surfaceMode === 'edit'; }
+function isLiveSurface() { return state.surfaceMode !== 'edit'; }
+
+function setSurfaceMode(mode) {
+  const next = mode === 'edit' ? 'edit' : 'live';
+  if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
+  if (state.uiMode === 'modal' || state.uiMode === 'present+modal') { showToast('请先关闭当前弹窗'); return; }
+  if (next === 'edit' && state.presentMode) togglePresentMode(false);
+  state.surfaceMode = next;
+  if (next === 'live') {
+    if (state.placeEventMode) togglePlaceEventMode(false);
+    clearSelection({ render: false });
+    hideObjectPanel();
+  }
+  updateSurfaceChrome();
+  refreshSelectionUi();
+  hideDropdown();
+  scheduleRender('all');
+}
+
+function updateSurfaceChrome() {
+  const app = $('app');
+  if (!app) return;
+  app.classList.toggle('surface-edit', isEditSurface());
+  app.classList.toggle('surface-live', isLiveSurface());
+  const btn = $('btn-surface-toggle');
+  if (btn) {
+    btn.textContent = isEditSurface() ? '回到跑团' : '编辑';
+    btn.title = isEditSurface() ? '回到跑团态' : '进入编辑态';
+  }
+  const status = $('status-saved');
+  if (status) status.dataset.surface = state.surfaceMode;
+}
+
+function canUseEditTools() {
+  return isEditSurface() && !state.presentMode && !state.gridCalibration &&
+    state.uiMode !== 'modal' && state.uiMode !== 'present+modal' && state.uiMode !== 'grid-calibration';
+}
+
+function requireEditSurface() {
+  if (canUseEditTools()) return true;
+  if (state.gridCalibration) showToast('请先完成或取消网格校准');
+  else showToast('请先进入编辑态');
+  return false;
+}
+
+function refreshSelectionUi() {
+  updateTokenActionBar();
+  updateAnnotationActionBar();
+  updateObjectPanel();
+}
+
+function getSelectedObject() {
+  if (state.selectedTokenId) {
+    const item = state.tokens.find((t) => t.id === state.selectedTokenId);
+    if (item) return { kind: 'token', item };
+  }
+  if (state.selectedAnnotationId) {
+    const item = state.annotations.find((a) => a.id === state.selectedAnnotationId);
+    if (item) return { kind: 'annotation', item };
+  }
+  if (state.selectedEventId) {
+    const item = state.events.find((e) => e.id === state.selectedEventId);
+    if (item) return { kind: 'event', item };
+  }
+  return null;
+}
+
+function setSelectedObject(kind, id, opts = {}) {
+  state.selectedTokenId = kind === 'token' ? id : null;
+  state.selectedAnnotationId = kind === 'annotation' ? id : null;
+  state.selectedEventId = kind === 'event' ? id : null;
+  if (kind !== 'event' || !opts.keepEventCard) hideEventCard();
+  refreshSelectionUi();
+  if (opts.locate) locateSelectedObject();
+  if (opts.render !== false) scheduleRender('all');
+}
+
+function clearSelection(opts = {}) {
+  if (!state.selectedTokenId && !state.selectedAnnotationId && !state.selectedEventId && !state.eventCardOpenId) return;
+  state.selectedTokenId = null;
+  state.selectedAnnotationId = null;
+  state.selectedEventId = null;
+  if (!opts.keepEventCard) hideEventCard();
+  refreshSelectionUi();
+  if (opts.render !== false) scheduleRender('all');
+}
+
+function hideObjectPanel() {
+  const panel = $('object-panel');
+  if (panel) panel.innerHTML = '';
+}
+
+function objectMaskLabel(kind, item) {
+  if (kind === 'event') return item.layer === 0 ? '公开事件' : '受事件雾';
+  if (kind === 'annotation') {
+    const mode = normalizeAnnotationMaskMode(item.maskMode);
+    if (mode === 'terrain') return isAnnotationVisible(item) ? '受地形雾 · 可见' : '受地形雾 · 被遮挡';
+    if (mode === 'event') return isAnnotationVisible(item) ? '受事件雾 · 可见' : '受事件雾 · 被遮挡';
+    return '公开标注';
+  }
+  return 'Token';
+}
+
+function objectTitle(kind, item) {
+  if (kind === 'event') return item.title || '（未命名事件）';
+  if (kind === 'annotation') {
+    if (item.type === 'text') return item.text || '（空文字）';
+    return '图片标注';
+  }
+  return item.name || 'Token';
+}
+
+function objectThumb(kind, item) {
+  if (kind === 'event') {
+    if (item.icon && item.icon.type === 'emoji') return escapeHtml(item.icon.value || '？');
+    return '事';
+  }
+  if (kind === 'annotation') return item.type === 'text' ? '文' : '图';
+  return 'T';
+}
+
+function objectSizeSummary(kind, item) {
+  if (kind === 'event') return `${Math.round(item.size || EVENT_DEFAULT_SIZE)}px`;
+  if (kind === 'annotation') return `${Math.round(annotationPrimarySize(item))}px`;
+  return `${Math.round(item.size || TOKEN_DEFAULT_SIZE)}px`;
+}
+
+function updateObjectPanel() {
+  const panel = $('object-panel');
+  if (!panel || !isEditSurface()) return;
+  const items = [
+    ...state.events.map((item) => ({ kind: 'event', item })),
+    ...state.tokens.map((item) => ({ kind: 'token', item })),
+    ...state.annotations.map((item) => ({ kind: 'annotation', item })),
+  ];
+  const selected = getSelectedObject();
+  const sceneName = state.currentSceneId && state.scenes[state.currentSceneId]
+    ? (state.scenes[state.currentSceneId].name || '当前场景')
+    : '当前场景';
+  panel.innerHTML = `
+    <div class="object-panel-header">
+      <div>
+        <div class="object-panel-title">对象</div>
+        <div class="object-panel-meta">${escapeHtml(sceneName)} · ${items.length} 项</div>
+      </div>
+      <button id="object-panel-live" title="回到跑团态">回到跑团</button>
+    </div>
+    <div class="object-panel-list" id="object-panel-list"></div>
+  `;
+  $('object-panel-live').addEventListener('click', () => setSurfaceMode('live'));
+  const list = $('object-panel-list');
+  if (items.length === 0) {
+    list.innerHTML = '<div class="object-empty">当前场景还没有事件、Token 或标注。</div>';
+    return;
+  }
+  const sections = [
+    ['event', '事件', items.filter((x) => x.kind === 'event')],
+    ['token', 'Token', items.filter((x) => x.kind === 'token')],
+    ['annotation', '标注', items.filter((x) => x.kind === 'annotation')],
+  ];
+  for (const [, label, rows] of sections) {
+    if (rows.length === 0) continue;
+    const title = document.createElement('div');
+    title.className = 'object-section-title';
+    title.textContent = `${label} · ${rows.length}`;
+    list.appendChild(title);
+    for (const row of rows) {
+      const isSelected = selected && selected.kind === row.kind && selected.item.id === row.item.id;
+      const btn = document.createElement('button');
+      btn.className = 'object-row' + (isSelected ? ' selected' : '');
+      btn.dataset.kind = row.kind;
+      btn.dataset.id = row.item.id;
+      btn.innerHTML = `
+        <span class="object-thumb">${objectThumb(row.kind, row.item)}</span>
+        <span class="object-main">
+          <span class="object-name">${escapeHtml(objectTitle(row.kind, row.item))}</span>
+          <span class="object-sub">${escapeHtml(objectMaskLabel(row.kind, row.item))} · ${escapeHtml(objectSizeSummary(row.kind, row.item))}</span>
+        </span>
+        <span class="object-locate" title="定位">⌖</span>
+      `;
+      btn.addEventListener('click', (e) => {
+        const locate = Boolean(e.target.closest('.object-locate'));
+        setSelectedObject(row.kind, row.item.id, { locate });
+      });
+      btn.addEventListener('dblclick', () => editObjectFromPanel(row.kind, row.item.id));
+      list.appendChild(btn);
+    }
+  }
+}
+
+function editObjectFromPanel(kind, id) {
+  if (!requireEditSurface()) return;
+  if (kind === 'event') { hideEventCard(); openEventEditDialog(null, id); return; }
+  if (kind === 'token') { openEditTokenModal(id); return; }
+  if (kind === 'annotation') openAnnotationEditDialog(id);
+}
+
+function locateSelectedObject() {
+  const selected = getSelectedObject();
+  if (!selected || !state.hasMap) return;
+  const item = selected.item;
+  const rect = state.mainCanvas.parentElement.getBoundingClientRect();
+  const panel = $('object-panel');
+  const panelShown = panel && getComputedStyle(panel).display !== 'none';
+  let panelW = 0;
+  let panelH = 0;
+  if (panelShown) {
+    const panelRect = panel.getBoundingClientRect();
+    if (panelRect.height > rect.height * 0.7) panelW = panelRect.width;
+    else panelH = panelRect.height;
+  }
+  const targetCx = Math.max(1, rect.width - panelW) / 2;
+  const targetCy = Math.max(1, rect.height - panelH) / 2;
+  state.view.x = targetCx - item.x * state.view.scale;
+  state.view.y = targetCy - item.y * state.view.scale;
+  state.viewIsPristineFit = false;
+  updateZoomStatus();
+  if (selected.kind === 'event') positionEventCard();
+  else hideEventCard();
+  scheduleRender('all');
+}
+
 function applyRestoredView(savedView, opts = {}) {
   if (opts.fitViewAfterRestore || !savedView) {
     fitView();
@@ -1688,7 +2047,7 @@ async function exportProject() {
     const payload = {
       format: 'fog-of-war-map.fogbundle',
       schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
-      appVersion: 'v3.6.0',
+      appVersion: 'v3.7.0',
       exportedAt: new Date().toISOString(),
       sceneCount: scenes.length,
       currentSceneId: state.currentSceneId,
@@ -2008,8 +2367,19 @@ async function switchScene(targetId) {
     showToast('目标场景无地图，请重新加载地图');
     state.currentSceneId = targetId;
     state.hasMap = false;
+    clearAnnotationRuntimeResources();
+    state.tokens = [];
+    state.events = [];
+    state.annotations = [];
+    clearSelection({ render: false });
+    state.undoStack = [];
+    updateTokensStatus();
+    updateEventsStatus();
+    updateAnnotationsStatus();
+    updateUndoButton();
     $('splash').style.display = 'flex';
     updateSceneStatus();
+    updateObjectPanel();
     triggerImmediateSave();
     return;
   }
@@ -2060,7 +2430,7 @@ async function deleteScene(id) {
       state.hasMap = false;
       clearAnnotationRuntimeResources();
       state.tokens = []; state.events = []; state.annotations = [];
-      state.selectedTokenId = null; state.selectedEventId = null; state.selectedAnnotationId = null;
+      clearSelection({ render: false });
       state.undoStack = [];
       // 释放 mapImage
       if (state.mapImage && typeof state.mapImage.close === 'function') {
@@ -2068,7 +2438,7 @@ async function deleteScene(id) {
       }
       state.mapImage = null;
       updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton(); updateSceneStatus();
-      updateTokenActionBar(); updateAnnotationActionBar();
+      refreshSelectionUi();
       $('splash').style.display = 'flex';
       scheduleRender('all');
     }
@@ -2080,6 +2450,7 @@ async function deleteScene(id) {
 
 function openSceneManagerModal() {
   const ids = Object.keys(state.scenes);
+  const canEditScenes = isEditSurface();
   // 按 lastUsedAt 倒序
   ids.sort((a, b) => (state.scenes[b].lastUsedAt || 0) - (state.scenes[a].lastUsedAt || 0));
   const rows = ids.map((id) => {
@@ -2094,27 +2465,29 @@ function openSceneManagerModal() {
         <span class="scene-meta">${hasMap ? '🗺' : '⚠ 无图'} ${ago}</span>
         <div class="scene-actions">
           ${isCurrent ? '' : `<button class="scene-switch" data-id="${id}">切换</button>`}
-          <button class="scene-rename" data-id="${id}">改名</button>
-          <button class="scene-delete" data-id="${id}">删</button>
+          ${canEditScenes ? `<button class="scene-rename" data-id="${id}">改名</button>` : ''}
+          ${canEditScenes ? `<button class="scene-delete" data-id="${id}">删</button>` : ''}
         </div>
       </div>
     `;
   }).join('');
   showModal(`
-    <div class="modal-title">场景管理（${ids.length}）</div>
-    <div class="modal-desc">每个场景含独立的地图、迷雾、Token、事件、视口。"新建场景"会让你选一张新地图。</div>
+    <div class="modal-title">${canEditScenes ? '场景管理' : '切换场景'}（${ids.length}）</div>
+    <div class="modal-desc">${canEditScenes ? '每个场景含独立的地图、迷雾、Token、事件、视口。"新建场景"会让你选一张新地图。' : '跑团态只用于切换已准备好的场景。新建、改名和删除请进入编辑态。'}</div>
     <div class="scene-list">${rows || '<div style="color:var(--theme-text-muted);padding:20px;text-align:center;">暂无场景，先加载一张地图</div>'}</div>
     <div class="modal-actions">
       <button id="scene-close">关闭</button>
-      <button id="scene-new" class="primary">+ 新建场景（加载地图）</button>
+      ${canEditScenes ? '<button id="scene-new" class="primary">+ 新建场景（加载地图）</button>' : ''}
     </div>
   `, {
     onMounted: () => {
       $('scene-close').addEventListener('click', closeModal);
-      $('scene-new').addEventListener('click', () => {
-        closeModal();
-        $('file-input-map').click();
-      });
+      if (canEditScenes) {
+        $('scene-new').addEventListener('click', () => {
+          closeModal();
+          $('file-input-map').click();
+        });
+      }
       document.querySelectorAll('.scene-switch').forEach((b) => {
         b.addEventListener('click', () => {
           closeModal();
@@ -2296,12 +2669,7 @@ function startGridCalibration() {
   hideDropdown();
   if (state.activeStroke) onStrokeEnd(false);
   cancelLongPress();
-  hideEventCard();
-  state.selectedTokenId = null;
-  state.selectedEventId = null;
-  state.selectedAnnotationId = null;
-  updateTokenActionBar();
-  updateAnnotationActionBar();
+  clearSelection({ render: false });
   state.gridCalibration = {
     originalGrid: cloneGridSettings(state.grid),
     pointerId: null,
@@ -3085,7 +3453,7 @@ function onStrokeEnd(cancelled) {
   });
   state.strokesSinceCheckpoint += 1;
   maybeCheckpoint();
-  updateAnnotationActionBar();
+  refreshSelectionUi();
   triggerImmediateSave();
 }
 
@@ -3203,7 +3571,7 @@ async function undo() {
     }
   }
   updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus();
-  updateTokenActionBar(); updateAnnotationActionBar();
+  refreshSelectionUi();
   scheduleRender('all');
   updateUndoButton();
   showToast(describeUndoEntry(entry).replace('撤销', '已撤销'));
@@ -3250,20 +3618,22 @@ function clearFogLayer(layerKey) {
 }
 
 function applyFillAll(layerKey) {
+  if (!requireEditSurface()) return;
   fillFogLayer(layerKey);
   // 清空与该层相关的 fog 撤销项
   state.undoStack = state.undoStack.filter((e) => !(e.type === 'fog' && (e.layer === layerKey || e.layer === 'all')));
   updateUndoButton();
-  updateAnnotationActionBar();
+  refreshSelectionUi();
   scheduleRender('all');
   triggerImmediateSave();
 }
 
 function applyClearAll(layerKey) {
+  if (!requireEditSurface()) return;
   clearFogLayer(layerKey);
   state.undoStack = state.undoStack.filter((e) => !(e.type === 'fog' && (e.layer === layerKey || e.layer === 'all')));
   updateUndoButton();
-  updateAnnotationActionBar();
+  refreshSelectionUi();
   scheduleRender('all');
   triggerImmediateSave();
 }
@@ -3292,13 +3662,9 @@ async function createTokenFromFile(file, opts) {
     name, x: cx, y: cy, size: baseSize, zOrder: state.tokens.length,
   };
   state.tokens.push(token);
-  state.selectedTokenId = token.id;
-  state.selectedEventId = null;
-  state.selectedAnnotationId = null;
-  hideEventCard();
+  setSelectedObject('token', token.id, { render: false });
   updateTokensStatus();
-  updateTokenActionBar();
-  updateAnnotationActionBar();
+  refreshSelectionUi();
   scheduleRender('all');
   triggerImmediateSave();
 }
@@ -3316,15 +3682,20 @@ async function rebuildTokenFromSerialized(s) {
 function deleteSelectedToken() {
   if (!state.selectedTokenId) return;
   state.tokens = state.tokens.filter((t) => t.id !== state.selectedTokenId);
-  state.selectedTokenId = null;
+  clearSelection({ render: false });
   updateTokensStatus();
-  updateTokenActionBar();
   scheduleRender('all');
   triggerImmediateSave();
 }
 
-function updateTokensStatus() { $('status-tokens').textContent = state.tokens.length + ' Token'; }
-function updateEventsStatus() { $('status-events').textContent = state.events.length + ' 事件'; }
+function updateTokensStatus() {
+  $('status-tokens').textContent = state.tokens.length + ' Token';
+  updateObjectPanel();
+}
+function updateEventsStatus() {
+  $('status-events').textContent = state.events.length + ' 事件';
+  updateObjectPanel();
+}
 function updateSceneStatus() {
   const el = $('status-scene');
   if (!el) return;
@@ -3598,14 +3969,10 @@ function createTextAnnotation(opts) {
   };
   clampAnnotationToMap(ann);
   state.annotations.push(ann);
-  state.selectedAnnotationId = ann.id;
-  state.selectedTokenId = null;
-  state.selectedEventId = null;
-  hideEventCard();
+  setSelectedObject('annotation', ann.id, { render: false });
   pushUndo({ type: 'annotation-create', annotation: serializeAnnotation(ann) });
   updateAnnotationsStatus();
-  updateTokenActionBar();
-  updateAnnotationActionBar();
+  refreshSelectionUi();
   scheduleRender('all');
   triggerImmediateSave();
   return ann;
@@ -3628,14 +3995,10 @@ async function createImageAnnotationFromFile(file, opts) {
   };
   clampAnnotationToMap(ann);
   state.annotations.push(ann);
-  state.selectedAnnotationId = ann.id;
-  state.selectedTokenId = null;
-  state.selectedEventId = null;
-  hideEventCard();
+  setSelectedObject('annotation', ann.id, { render: false });
   pushUndo({ type: 'annotation-create', annotation: serializeAnnotation(ann) });
   updateAnnotationsStatus();
-  updateTokenActionBar();
-  updateAnnotationActionBar();
+  refreshSelectionUi();
   scheduleRender('all');
   triggerImmediateSave();
   return ann;
@@ -3654,7 +4017,7 @@ async function modifyAnnotation(id, changes) {
   if (changes.width !== undefined) setAnnotationPrimarySize(ann, changes.width);
   clampAnnotationToMap(ann);
   pushUndo({ type: 'annotation-modify', id, before, after: serializeAnnotation(ann) });
-  updateAnnotationActionBar();
+  refreshSelectionUi();
   scheduleRender('all');
   triggerImmediateSave();
 }
@@ -3665,10 +4028,10 @@ function deleteAnnotation(id) {
   const ann = state.annotations[idx];
   state.annotations.splice(idx, 1);
   closeAnnotationBitmap(ann);
-  if (state.selectedAnnotationId === id) state.selectedAnnotationId = null;
+  if (state.selectedAnnotationId === id) clearSelection({ render: false });
   pushUndo({ type: 'annotation-delete', annotation: serializeAnnotation(ann) });
   updateAnnotationsStatus();
-  updateAnnotationActionBar();
+  refreshSelectionUi();
   scheduleRender('all');
   triggerImmediateSave();
 }
@@ -3697,13 +4060,14 @@ function setAnnotationPrimarySize(ann, size) {
 function updateAnnotationsStatus() {
   const el = $('status-annotations');
   if (el) el.textContent = state.annotations.length + ' 标注';
+  updateObjectPanel();
 }
 
 function updateAnnotationActionBar() {
   const bar = $('annotation-action-bar');
   if (!bar) return;
   const ann = state.annotations.find((a) => a.id === state.selectedAnnotationId);
-  if (!ann || !isAnnotationVisible(ann)) {
+  if (!ann || !isEditSurface() || !isAnnotationVisible(ann)) {
     bar.classList.remove('visible');
     bar.innerHTML = '';
     return;
@@ -3723,6 +4087,7 @@ function updateAnnotationActionBar() {
     setAnnotationPrimarySize(ann, parseInt(sizeInput.value, 10));
     scheduleRender('all');
     positionAnnotationActionBar();
+    updateObjectPanel();
     triggerDebouncedSave();
   });
   const editBtn = document.createElement('button');
@@ -3777,11 +4142,7 @@ function createEvent(opts) {
     layer: (opts.layer === 0 ? 0 : 1),  // 0 = 永远可见；1 = 被事件 fog 遮（默认）
   };
   state.events.push(ev);
-  state.selectedEventId = ev.id;
-  state.selectedTokenId = null;
-  state.selectedAnnotationId = null;
-  updateTokenActionBar();
-  updateAnnotationActionBar();
+  setSelectedObject('event', ev.id, { render: false });
   pushUndo({ type: 'event-create', event: serializeEvent(ev) });
   updateEventsStatus();
   scheduleRender('all');
@@ -3795,9 +4156,9 @@ function deleteEvent(id) {
   const ev = state.events[idx];
   pushUndo({ type: 'event-delete', event: serializeEvent(ev) });
   state.events.splice(idx, 1);
-  if (state.selectedEventId === id) state.selectedEventId = null;
-  hideEventCard();
+  if (state.selectedEventId === id || state.eventCardOpenId === id) clearSelection({ render: false });
   updateEventsStatus();
+  refreshSelectionUi();
   scheduleRender('all');
   triggerImmediateSave();
 }
@@ -3818,6 +4179,7 @@ async function modifyEvent(id, changes) {
   if (changes.size !== undefined) ev.size = changes.size;
   if (changes.layer !== undefined) ev.layer = (changes.layer === 0 ? 0 : 1);
   pushUndo({ type: 'event-modify', id, before, after: serializeEvent(ev) });
+  updateObjectPanel();
   scheduleRender('all');
   triggerImmediateSave();
 }
@@ -3917,11 +4279,13 @@ function showEventCard(eventId) {
   positionEventCard();
   $('evcard-edit').addEventListener('click', (e) => {
     e.stopPropagation();
+    if (!requireEditSurface()) return;
     hideEventCard();
     openEventEditDialog(null, eventId);
   });
   $('evcard-del').addEventListener('click', (e) => {
     e.stopPropagation();
+    if (!requireEditSurface()) return;
     showConfirm('删除事件', `确定删除"${ev.title || '（未命名）'}"？可用 Ctrl+Z 撤销。`, () => {
       deleteEvent(eventId);
     }, { danger: true, yesText: '删除' });
@@ -3961,7 +4325,7 @@ function positionEventCard() {
 // ============== Token 浮动操作条 ==============
 function updateTokenActionBar() {
   const bar = $('token-action-bar');
-  if (!state.selectedTokenId || !state.isCoarsePointer) {
+  if (!state.selectedTokenId || !state.isCoarsePointer || !isEditSurface()) {
     bar.classList.remove('visible');
     bar.innerHTML = '';
     return;
@@ -3979,6 +4343,7 @@ function updateTokenActionBar() {
     scheduleRender('all');
     triggerDebouncedSave();
     positionTokenActionBar();
+    updateObjectPanel();
   });
   sizeInput.addEventListener('change', () => triggerImmediateSave());
   const editBtn = document.createElement('button');
@@ -4064,8 +4429,9 @@ function onPointerDown(e) {
   // 鼠标右键不再做平移（保留浏览器默认右键菜单），左键 = button 0
   if (e.pointerType === 'mouse' && e.button !== 0) return;
 
-  // Shift + 左键单击 = 创建事件
+  // Shift + 左键单击 = 创建事件（编辑态）
   if (e.button === 0 && e.shiftKey) {
+    if (!requireEditSurface()) return;
     const [mx, my] = screenToMap(sx, sy);
     if (insideMap(mx, my)) {
       info.role = 'create-event';
@@ -4076,6 +4442,7 @@ function onPointerDown(e) {
 
   // placeEventMode 下任何左键点击 = 创建事件
   if (state.placeEventMode) {
+    if (!requireEditSurface()) { togglePlaceEventMode(false); return; }
     const [mx, my] = screenToMap(sx, sy);
     if (insideMap(mx, my)) {
       info.role = 'create-event';
@@ -4099,54 +4466,38 @@ function onPointerDown(e) {
   const [mx, my] = screenToMap(sx, sy);
   const hitToken = findTopTokenAt(mx, my);
   if (hitToken) {
-    state.selectedTokenId = hitToken.id;
-    state.selectedEventId = null;
-    state.selectedAnnotationId = null;
-    hideEventCard();
-    info.role = 'token-drag';
+    setSelectedObject('token', hitToken.id, { render: false });
+    info.role = isEditSurface() ? 'token-drag' : 'token-select';
     info.tokenId = hitToken.id;
     info.tokenStartX = hitToken.x;
     info.tokenStartY = hitToken.y;
     info.dragStartMapX = mx;
     info.dragStartMapY = my;
-    updateTokenActionBar();
-    updateAnnotationActionBar();
     scheduleRender('all');
     return;
   }
 
   const hitAnnotation = findTopAnnotationAt(mx, my);
   if (hitAnnotation) {
-    state.selectedAnnotationId = hitAnnotation.id;
-    state.selectedTokenId = null;
-    state.selectedEventId = null;
-    hideEventCard();
-    info.role = 'annotation-drag';
+    setSelectedObject('annotation', hitAnnotation.id, { render: false });
+    info.role = isEditSurface() ? 'annotation-drag' : 'annotation-select';
     info.annotationId = hitAnnotation.id;
     info.annotationStartX = hitAnnotation.x;
     info.annotationStartY = hitAnnotation.y;
     info.dragStartMapX = mx;
     info.dragStartMapY = my;
-    updateTokenActionBar();
-    updateAnnotationActionBar();
     scheduleRender('all');
     return;
   }
 
   // 空白：触屏长按预备 + 笔刷 stroke
-  if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+  if (isEditSurface() && (e.pointerType === 'touch' || e.pointerType === 'pen')) {
     startLongPressTimer(info, sx, sy);
   }
 
   // 取消选中
   if (state.selectedTokenId || state.selectedEventId || state.selectedAnnotationId) {
-    state.selectedTokenId = null;
-    state.selectedEventId = null;
-    state.selectedAnnotationId = null;
-    hideEventCard();
-    updateTokenActionBar();
-    updateAnnotationActionBar();
-    scheduleRender('all');
+    clearSelection({ render: false });
   }
 
   info.role = state.brush.mode;
@@ -4247,7 +4598,7 @@ function onPointerMove(e) {
   } else if (info.role === 'event-interact' || info.role === 'event-drag') {
     // 距起点超过阈值则进入 drag
     const ds = dist(info.startX, info.startY, x, y);
-    if (info.role === 'event-interact' && ds > EVENT_DRAG_THRESHOLD) {
+    if (info.role === 'event-interact' && isEditSurface() && ds > EVENT_DRAG_THRESHOLD) {
       info.role = 'event-drag';
     }
     if (info.role === 'event-drag') {
@@ -4293,6 +4644,8 @@ function onPointerUp(e) {
     const ev = state.events.find((e) => e.id === info.eventId);
     if (ev) pushUndo({ type: 'event-move', id: ev.id, prevX: info.eventStartX, prevY: info.eventStartY });
     triggerImmediateSave();
+  } else if (info.role === 'token-select' || info.role === 'annotation-select') {
+    // 跑团态只选中查看，不移动或保存对象。
   } else if (info.role === 'event-interact') {
     // 单击：根据是否双击决定
     const now = performance.now();
@@ -4300,12 +4653,8 @@ function onPointerUp(e) {
                      (now - state.lastEventClickTime) < DBL_CLICK_MS;
     state.lastEventClickId = info.eventId;
     state.lastEventClickTime = now;
-    state.selectedEventId = info.eventId;
-    state.selectedTokenId = null;
-    state.selectedAnnotationId = null;
-    updateTokenActionBar();
-    updateAnnotationActionBar();
-    if (isDouble && !state.presentMode) {
+    setSelectedObject('event', info.eventId, { render: false, keepEventCard: true });
+    if (isDouble && !state.presentMode && isEditSurface()) {
       hideEventCard();
       openEventEditDialog(null, info.eventId);
     } else {
@@ -4401,28 +4750,31 @@ function onWheel(e) {
     updateGridCalibrationPanel();
     invalidateGridCache();
     scheduleRender('all');
-  } else if (state.selectedTokenId && !e.shiftKey) {
+  } else if (isEditSurface() && state.selectedTokenId && !e.shiftKey) {
     const t = state.tokens.find((tt) => tt.id === state.selectedTokenId);
     if (t) {
       const maxSize = Math.min(state.mapCanvas.width, state.mapCanvas.height) / 2;
       t.size = clamp(t.size * factor, BRUSH_MIN, maxSize);
       scheduleRender('all');
       positionTokenActionBar();
+      updateObjectPanel();
       triggerDebouncedSave();
     }
-  } else if (state.selectedAnnotationId && !e.shiftKey) {
+  } else if (isEditSurface() && state.selectedAnnotationId && !e.shiftKey) {
     const ann = state.annotations.find((a) => a.id === state.selectedAnnotationId);
     if (ann) {
       setAnnotationPrimarySize(ann, annotationPrimarySize(ann) * factor);
       scheduleRender('all');
       positionAnnotationActionBar();
+      updateObjectPanel();
       triggerDebouncedSave();
     }
-  } else if (state.selectedEventId && !e.shiftKey) {
+  } else if (isEditSurface() && state.selectedEventId && !e.shiftKey) {
     const ev = state.events.find((e2) => e2.id === state.selectedEventId);
     if (ev) {
       ev.size = clamp(ev.size * factor, 16, 96);
       scheduleRender('all');
+      updateObjectPanel();
       triggerDebouncedSave();
     }
   } else {
@@ -4510,12 +4862,7 @@ function onKeyDown(e) {
       return;
     }
     if (state.selectedTokenId || state.selectedEventId || state.selectedAnnotationId) {
-      state.selectedTokenId = null;
-      state.selectedEventId = null;
-      state.selectedAnnotationId = null;
-      updateTokenActionBar();
-      updateAnnotationActionBar();
-      scheduleRender('all');
+      clearSelection();
       e.preventDefault();
       return;
     }
@@ -4538,6 +4885,7 @@ function onKeyDown(e) {
   if (e.key === 'q' || e.key === 'Q') { setBrushMode('reveal-all'); e.preventDefault(); return; }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { undo(); e.preventDefault(); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (!isEditSurface()) { showToast('删除对象请先进入编辑态'); e.preventDefault(); return; }
     if (state.selectedEventId) { deleteEvent(state.selectedEventId); e.preventDefault(); return; }
     if (state.selectedTokenId) { deleteSelectedToken(); e.preventDefault(); return; }
     if (state.selectedAnnotationId) { deleteSelectedAnnotation(); e.preventDefault(); return; }
@@ -4597,6 +4945,7 @@ function setBrushSize(v) {
 function togglePlaceEventMode(force) {
   if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
   const next = (force === undefined) ? !state.placeEventMode : force;
+  if (next && !isEditSurface()) { showToast('放置事件请先进入编辑态'); return; }
   const prev = state.placeEventMode;
   state.placeEventMode = next;
   $('btn-place-event').classList.toggle('active', next);
@@ -4614,6 +4963,11 @@ function togglePlaceEventMode(force) {
 function togglePresentMode(force) {
   if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
   const next = (force === undefined) ? !state.presentMode : force;
+  if (next && isEditSurface()) {
+    state.surfaceMode = 'live';
+    hideObjectPanel();
+    updateSurfaceChrome();
+  }
   state.presentMode = next;
   $('app').classList.toggle('present-mode', next);
   state.uiMode = next ? 'present' : 'normal';
@@ -4699,10 +5053,10 @@ function resetSceneWithPreparedMap(sceneId, file, preparedMap, nextFingerprint, 
   state.currentSceneId = sceneId;
   clearAnnotationRuntimeResources();
   state.tokens = []; state.events = []; state.annotations = [];
-  state.selectedTokenId = null; state.selectedEventId = null; state.selectedAnnotationId = null;
+  clearSelection({ render: false });
   state.undoStack = [];
   updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton();
-  updateTokenActionBar(); updateAnnotationActionBar();
+  refreshSelectionUi();
   fitView();
   setupBrushSizeFromState();
   promptInitialFog();
@@ -4725,11 +5079,11 @@ function createSceneWithPreparedMap(file, preparedMap, nextFingerprint, w, h) {
   state.currentSceneId = newId;
   clearAnnotationRuntimeResources();
   state.tokens = []; state.events = []; state.annotations = [];
-  state.selectedTokenId = null; state.selectedEventId = null; state.selectedAnnotationId = null;
+  clearSelection({ render: false });
   state.undoStack = [];
   state.grid = defaultGridSettings();
   updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton();
-  updateTokenActionBar(); updateAnnotationActionBar();
+  refreshSelectionUi();
   promptInitialFog();
 }
 
@@ -4873,12 +5227,12 @@ function promptInitialFog() {
     onMounted: () => {
       $('init-fill').addEventListener('click', () => {
         fillFogLayer('terrain'); fillFogLayer('event');
-        updateAnnotationActionBar();
+        refreshSelectionUi();
         scheduleRender('all'); triggerImmediateSave(); closeModal();
       });
       $('init-clear').addEventListener('click', () => {
         clearFogLayer('terrain'); clearFogLayer('event');
-        updateAnnotationActionBar();
+        refreshSelectionUi();
         scheduleRender('all'); triggerImmediateSave(); closeModal();
       });
     }
@@ -4942,9 +5296,7 @@ function applyPreparedRestore(prepared, opts = {}) {
     state.tokens = prepared.tokens;
     state.events = prepared.events;
     state.annotations = prepared.annotations || [];
-    state.selectedTokenId = null;
-    state.selectedEventId = null;
-    state.selectedAnnotationId = null;
+    clearSelection({ render: false });
     applyRestoredView(prepared.view, opts);
     if (prepared.settings) {
       state.brush.sizeScreen = prepared.settings.brushSize;
@@ -4967,7 +5319,7 @@ function applyPreparedRestore(prepared, opts = {}) {
     state.undoStack = [];
     updateUndoButton();
     updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus();
-    updateTokenActionBar(); updateAnnotationActionBar();
+    refreshSelectionUi();
     updateZoomStatus();
     scheduleRender('all');
     showToast('已恢复上次进度');
@@ -5473,80 +5825,85 @@ function showDropdown() {
   const rect = btn.getBoundingClientRect();
   menu.innerHTML = '';
   const layerLabel = state.currentLayer === 'terrain' ? '地形层' : '事件层';
-  const opacityRow = document.createElement('div');
-  opacityRow.className = 'menu-section';
-  opacityRow.innerHTML = `
-    <div style="margin-bottom:4px;">地形层不透明度: <span id="terrain-opacity-val">${Math.round(state.terrainFogOpacity * 100)}%</span></div>
-    <input id="terrain-opacity-slider" type="range" min="0" max="100" value="${Math.round(state.terrainFogOpacity * 100)}">
-    <div style="margin-top:10px;margin-bottom:4px;">事件层不透明度: <span id="event-opacity-val">${Math.round(state.eventFogOpacity * 100)}%</span></div>
-    <input id="event-opacity-slider" type="range" min="0" max="100" value="${Math.round(state.eventFogOpacity * 100)}">
-    <div style="margin-top:10px;margin-bottom:6px;">地形层颜色:</div>
-    <div class="fog-color-presets" id="terrain-color-presets">
-      <button class="fog-color-btn" data-color="#000000" title="黑" style="background:#000000"></button>
-      <button class="fog-color-btn" data-color="#1a1a1a" title="深炭" style="background:#1a1a1a"></button>
-      <button class="fog-color-btn" data-color="#2d3a2d" title="森林暗绿" style="background:#2d3a2d"></button>
-      <button class="fog-color-btn" data-color="#3a2a1e" title="土黄夜" style="background:#3a2a1e"></button>
-      <button class="fog-color-btn" data-color="#1c2438" title="深夜蓝" style="background:#1c2438"></button>
-      <input class="fog-color-hex" id="terrain-fog-hex" type="text" maxlength="7" placeholder="#hex">
-    </div>
-    <div style="margin-top:10px;margin-bottom:6px;">事件层颜色:</div>
-    <div class="fog-color-presets" id="event-color-presets">
-      <button class="fog-color-btn" data-color="#000000" title="黑" style="background:#000000"></button>
-      <button class="fog-color-btn" data-color="#333333" title="深灰" style="background:#333333"></button>
-      <button class="fog-color-btn" data-color="#5b2d6e" title="深紫（神秘）" style="background:#5b2d6e"></button>
-      <button class="fog-color-btn" data-color="#1e3a5f" title="深蓝（魔法）" style="background:#1e3a5f"></button>
-      <button class="fog-color-btn" data-color="#3f1d1d" title="深红（血雾）" style="background:#3f1d1d"></button>
-      <input class="fog-color-hex" id="event-fog-hex" type="text" maxlength="7" placeholder="#hex">
-    </div>
-  `;
-  menu.appendChild(opacityRow);
-  appendMenuDivider(menu);
+  if (isEditSurface()) {
+    const opacityRow = document.createElement('div');
+    opacityRow.className = 'menu-section';
+    opacityRow.innerHTML = `
+      <div style="margin-bottom:4px;">地形层不透明度: <span id="terrain-opacity-val">${Math.round(state.terrainFogOpacity * 100)}%</span></div>
+      <input id="terrain-opacity-slider" type="range" min="0" max="100" value="${Math.round(state.terrainFogOpacity * 100)}">
+      <div style="margin-top:10px;margin-bottom:4px;">事件层不透明度: <span id="event-opacity-val">${Math.round(state.eventFogOpacity * 100)}%</span></div>
+      <input id="event-opacity-slider" type="range" min="0" max="100" value="${Math.round(state.eventFogOpacity * 100)}">
+      <div style="margin-top:10px;margin-bottom:6px;">地形层颜色:</div>
+      <div class="fog-color-presets" id="terrain-color-presets">
+        <button class="fog-color-btn" data-color="#000000" title="黑" style="background:#000000"></button>
+        <button class="fog-color-btn" data-color="#1a1a1a" title="深炭" style="background:#1a1a1a"></button>
+        <button class="fog-color-btn" data-color="#2d3a2d" title="森林暗绿" style="background:#2d3a2d"></button>
+        <button class="fog-color-btn" data-color="#3a2a1e" title="土黄夜" style="background:#3a2a1e"></button>
+        <button class="fog-color-btn" data-color="#1c2438" title="深夜蓝" style="background:#1c2438"></button>
+        <input class="fog-color-hex" id="terrain-fog-hex" type="text" maxlength="7" placeholder="#hex">
+      </div>
+      <div style="margin-top:10px;margin-bottom:6px;">事件层颜色:</div>
+      <div class="fog-color-presets" id="event-color-presets">
+        <button class="fog-color-btn" data-color="#000000" title="黑" style="background:#000000"></button>
+        <button class="fog-color-btn" data-color="#333333" title="深灰" style="background:#333333"></button>
+        <button class="fog-color-btn" data-color="#5b2d6e" title="深紫（神秘）" style="background:#5b2d6e"></button>
+        <button class="fog-color-btn" data-color="#1e3a5f" title="深蓝（魔法）" style="background:#1e3a5f"></button>
+        <button class="fog-color-btn" data-color="#3f1d1d" title="深红（血雾）" style="background:#3f1d1d"></button>
+        <input class="fog-color-hex" id="event-fog-hex" type="text" maxlength="7" placeholder="#hex">
+      </div>
+    `;
+    menu.appendChild(opacityRow);
+    appendMenuDivider(menu);
 
-  const fillBtn = mkMenuItem(`全部覆盖（${layerLabel}）`);
-  fillBtn.addEventListener('click', () => {
-    hideDropdown();
-    showConfirm(`全部覆盖（${layerLabel}）`,
-      `${layerLabel}的所有揭示区域将变回未探索。会清空与该层相关的撤销项。`,
-      () => applyFillAll(state.currentLayer),
-      { danger: true, yesText: '确认覆盖' });
-  });
-  menu.appendChild(fillBtn);
+    const fillBtn = mkMenuItem(`全部覆盖（${layerLabel}）`);
+    fillBtn.addEventListener('click', () => {
+      hideDropdown();
+      showConfirm(`全部覆盖（${layerLabel}）`,
+        `${layerLabel}的所有揭示区域将变回未探索。会清空与该层相关的撤销项。`,
+        () => applyFillAll(state.currentLayer),
+        { danger: true, yesText: '确认覆盖' });
+    });
+    menu.appendChild(fillBtn);
 
-  const clrBtn = mkMenuItem(`全部揭示（${layerLabel}）`);
-  clrBtn.addEventListener('click', () => {
-    hideDropdown();
-    showConfirm(`全部揭示（${layerLabel}）`,
-      `${layerLabel}的所有迷雾将清除。会清空与该层相关的撤销项。`,
-      () => applyClearAll(state.currentLayer),
-      { danger: true, yesText: '确认揭示' });
-  });
-  menu.appendChild(clrBtn);
+    const clrBtn = mkMenuItem(`全部揭示（${layerLabel}）`);
+    clrBtn.addEventListener('click', () => {
+      hideDropdown();
+      showConfirm(`全部揭示（${layerLabel}）`,
+        `${layerLabel}的所有迷雾将清除。会清空与该层相关的撤销项。`,
+        () => applyClearAll(state.currentLayer),
+        { danger: true, yesText: '确认揭示' });
+    });
+    menu.appendChild(clrBtn);
 
-  appendMenuDivider(menu);
+    appendMenuDivider(menu);
+  }
   const cpBtn = mkMenuItem(`恢复到 Checkpoint (${state.checkpoints.length})`);
   cpBtn.disabled = state.checkpoints.length === 0;
   cpBtn.addEventListener('click', () => { hideDropdown(); showCheckpointList(); });
   menu.appendChild(cpBtn);
 
-  const clearCpBtn = mkMenuItem('清理全部 Checkpoint');
-  clearCpBtn.addEventListener('click', () => {
-    hideDropdown();
-    showConfirm('清理 Checkpoint', '将删除全部自动备份，释放存储空间。', () => clearCheckpoints(),
-      { danger: true, yesText: '确认清理' });
-  });
-  menu.appendChild(clearCpBtn);
-
-  appendMenuDivider(menu);
-  const gridLabel = state.grid.enabled ? '已开' : '已关';
-  const gridBtn = mkMenuItem(`📐 网格设置（${gridLabel}）`);
-  gridBtn.addEventListener('click', () => { hideDropdown(); openGridSettingsModal(); });
-  menu.appendChild(gridBtn);
-
   appendMenuDivider(menu);
   const sceneCount = Object.keys(state.scenes).length;
-  const sceneBtn = mkMenuItem(`📚 场景管理（${sceneCount}）`);
+  const sceneBtn = mkMenuItem(isEditSurface() ? `📚 场景管理（${sceneCount}）` : `📚 切换场景（${sceneCount}）`);
   sceneBtn.addEventListener('click', () => { hideDropdown(); openSceneManagerModal(); });
   menu.appendChild(sceneBtn);
+
+  if (isEditSurface()) {
+    const clearCpBtn = mkMenuItem('清理全部 Checkpoint');
+    clearCpBtn.addEventListener('click', () => {
+      hideDropdown();
+      showConfirm('清理 Checkpoint', '将删除全部自动备份，释放存储空间。', () => clearCheckpoints(),
+        { danger: true, yesText: '确认清理' });
+    });
+    menu.appendChild(clearCpBtn);
+
+    appendMenuDivider(menu);
+    const gridLabel = state.grid.enabled ? '已开' : '已关';
+    const gridBtn = mkMenuItem(`📐 网格设置（${gridLabel}）`);
+    gridBtn.addEventListener('click', () => { hideDropdown(); openGridSettingsModal(); });
+    menu.appendChild(gridBtn);
+
+  }
 
   appendMenuDivider(menu);
   const expBtn = mkMenuItem('📤 导出全部场景（不含地图）');
@@ -5557,22 +5914,25 @@ function showDropdown() {
   impBtn.addEventListener('click', () => { hideDropdown(); $('file-input-import').click(); });
   menu.appendChild(impBtn);
 
-  appendMenuDivider(menu);
-  const wipeBtn = mkMenuItem('清空所有数据');
-  wipeBtn.classList.add('danger');
-  wipeBtn.addEventListener('click', () => {
-    hideDropdown();
-    showConfirm('清空所有数据',
-      '所有迷雾、Token、事件、标注和 Checkpoint 都会删除。地图本身不受影响，但需要重新加载。',
-      async () => { await clearAllData(); location.reload(); },
-      { danger: true, yesText: '确认清空' });
-  });
-  menu.appendChild(wipeBtn);
+  if (isEditSurface()) {
+    appendMenuDivider(menu);
+    const wipeBtn = mkMenuItem('清空所有数据');
+    wipeBtn.classList.add('danger');
+    wipeBtn.addEventListener('click', () => {
+      hideDropdown();
+      showConfirm('清空所有数据',
+        '所有迷雾、Token、事件、标注和 Checkpoint 都会删除。地图本身不受影响，但需要重新加载。',
+        async () => { await clearAllData(); location.reload(); },
+        { danger: true, yesText: '确认清空' });
+    });
+    menu.appendChild(wipeBtn);
+  }
 
   menu.style.left = (rect.right - 240) + 'px';
   menu.style.top = (rect.bottom + 6) + 'px';
   menu.classList.add('visible');
 
+  if (!isEditSurface()) return;
   $('terrain-opacity-slider').addEventListener('input', (e) => {
     state.terrainFogOpacity = parseInt(e.target.value, 10) / 100;
     $('terrain-opacity-val').textContent = Math.round(state.terrainFogOpacity * 100) + '%';
@@ -5768,6 +6128,7 @@ async function init() {
   await ensureDb();
 
   setupEventListeners();
+  updateSurfaceChrome();
   setBrushMode('reveal');
   setLayer('terrain');
   setupBrushSizeFromState();
@@ -5780,6 +6141,7 @@ async function init() {
   // v3: 启动时尝试自动加载 currentScene（如果它有 mapBlob）
   await tryAutoLoadCurrentScene();
   updateSceneStatus();
+  updateObjectPanel();
 }
 
 async function tryAutoLoadCurrentScene() {
@@ -5836,19 +6198,19 @@ function setupEventListeners() {
     const off = getCanvasOffset();
     const x = e.clientX - off.x, y = e.clientY - off.y;
     const hitEvent = findTopEventAt(x, y, e.pointerType || 'mouse');
-    if (hitEvent && !state.presentMode) {
+    if (hitEvent && !state.presentMode && isEditSurface()) {
       hideEventCard();
       openEventEditDialog(null, hitEvent.id);
       return;
     }
     const [mx, my] = screenToMap(x, y);
     const hitToken = findTopTokenAt(mx, my);
-    if (hitToken && !state.presentMode) {
+    if (hitToken && !state.presentMode && isEditSurface()) {
       openEditTokenModal(hitToken.id);
       return;
     }
     const hitAnnotation = findTopAnnotationAt(mx, my);
-    if (hitAnnotation && !state.presentMode) {
+    if (hitAnnotation && !state.presentMode && isEditSurface()) {
       openAnnotationEditDialog(hitAnnotation.id);
       return;
     }
@@ -5871,22 +6233,25 @@ function setupEventListeners() {
   }
 
   $('btn-load-map').addEventListener('click', () => {
+    if (!requireEditSurface()) return;
     if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
     $('file-input-map').click();
   });
   $('file-input-map').addEventListener('change', (e) => {
     const f = e.target.files[0];
-    if (f) loadMapFile(f);
+    if (f && requireEditSurface()) loadMapFile(f);
     e.target.value = '';
   });
 
   $('btn-load-token').addEventListener('click', () => {
+    if (!requireEditSurface()) return;
     if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
     if (!state.hasMap) { showToast('请先加载地图'); return; }
     $('file-input-token').click();
   });
   $('file-input-token').addEventListener('change', (e) => {
     const f = e.target.files[0];
+    if (f && !requireEditSurface()) { e.target.value = ''; return; }
     if (state.gridCalibration) { showToast('请先完成或取消网格校准'); e.target.value = ''; return; }
     if (f) {
       const lower = f.name.toLowerCase();
@@ -5901,17 +6266,20 @@ function setupEventListeners() {
   });
 
   $('btn-add-text').addEventListener('click', () => {
+    if (!requireEditSurface()) return;
     if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
     if (!state.hasMap) { showToast('请先加载地图'); return; }
     openTextAnnotationDialog();
   });
   $('btn-add-image').addEventListener('click', () => {
+    if (!requireEditSurface()) return;
     if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
     if (!state.hasMap) { showToast('请先加载地图'); return; }
     $('file-input-annotation-image').click();
   });
   $('file-input-annotation-image').addEventListener('change', (e) => {
     const f = e.target.files[0];
+    if (f && !requireEditSurface()) { e.target.value = ''; return; }
     if (state.gridCalibration) { showToast('请先完成或取消网格校准'); e.target.value = ''; return; }
     if (f) {
       const lower = f.name.toLowerCase();
@@ -5933,6 +6301,7 @@ function setupEventListeners() {
   });
 
   $('btn-place-event').addEventListener('click', () => {
+    if (!requireEditSurface()) return;
     if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
     if (!state.hasMap) { showToast('请先加载地图'); return; }
     togglePlaceEventMode();
@@ -5955,6 +6324,7 @@ function setupEventListeners() {
     undo();
   });
 
+  $('btn-surface-toggle').addEventListener('click', () => setSurfaceMode(isEditSurface() ? 'live' : 'edit'));
   $('btn-present').addEventListener('click', () => togglePresentMode());
   $('present-handle').addEventListener('click', () => togglePresentMode(false));
 
@@ -6005,6 +6375,7 @@ function setupEventListeners() {
     }
     const f = e.dataTransfer.files[0];
     if (!f) return;
+    if (!requireEditSurface()) return;
     if (state.hasMap) {
       showConfirm('文件用途', '把拖入的图片作为？', () => {
         loadMapFile(f);
