@@ -2815,6 +2815,69 @@ async function canvasToBlob(canvas) {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
 }
 
+function isValidMapSize(size) {
+  return Boolean(size && Number.isFinite(size.w) && Number.isFinite(size.h) && size.w > 0 && size.h > 0);
+}
+
+function sceneHasRestorableGeometry(scene) {
+  return Boolean(scene && isValidMapSize(scene.mapSize) && scene.fogLayers?.terrain?.blob && scene.fogLayers?.event?.blob);
+}
+
+function sceneNeedsLocalMap(scene) {
+  return Boolean(scene && !scene.mapBlob && sceneHasRestorableGeometry(scene) && (scene.mapMissing || scene.mapSource?.type === 'placeholder'));
+}
+
+function sceneMapRuntimeFields(prev) {
+  const hasBlob = Boolean(prev && prev.mapBlob);
+  return {
+    mapBlob: hasBlob ? prev.mapBlob : null,
+    mapMissing: hasBlob ? false : Boolean(prev && (prev.mapMissing || prev.mapSource?.type === 'placeholder')),
+    mapSource: hasBlob ? null : (prev && prev.mapSource ? { ...prev.mapSource } : null),
+  };
+}
+
+function createPlaceholderPreparedMap(mapSize, label = '本机地图待绑定') {
+  if (!isValidMapSize(mapSize)) throw new Error('缺少地图尺寸，无法创建占位地图');
+  const w = Math.round(mapSize.w);
+  const h = Math.round(mapSize.h);
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#11100d';
+  ctx.fillRect(0, 0, w, h);
+  const step = Math.max(96, Math.min(320, Math.round(Math.max(w, h) / 12)));
+  ctx.strokeStyle = 'rgba(214, 174, 92, 0.13)';
+  ctx.lineWidth = Math.max(1, Math.round(step / 80));
+  for (let x = 0; x <= w; x += step) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= h; y += step) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(241, 226, 190, 0.72)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.max(24, Math.min(72, Math.round(Math.min(w, h) / 14)))}px ${state.theme.fontFamily}`;
+  ctx.fillText(label, w / 2, h / 2);
+  ctx.font = `500 ${Math.max(14, Math.min(32, Math.round(Math.min(w, h) / 28)))}px ${state.theme.fontFamily}`;
+  ctx.fillStyle = 'rgba(241, 226, 190, 0.5)';
+  ctx.fillText(`${w} × ${h}`, w / 2, h / 2 + Math.max(34, Math.min(86, Math.round(Math.min(w, h) / 10))));
+  return { canvas, w, h, originalW: w, originalH: h, downsampled: false, placeholder: true };
+}
+
+async function prepareSceneMapForRestore(scene) {
+  if (scene?.mapBlob) return await prepareMapFromBlob(scene.mapBlob);
+  if (sceneNeedsLocalMap(scene)) return createPlaceholderPreparedMap(scene.mapSize);
+  throw new Error('目标场景无地图，请重新加载地图');
+}
+
 // 把当前渲染层 state 序列化为 v2-saved 格式的 scene 内容
 async function serializeActiveSceneData() {
   const terrainBlob = await canvasToBlob(state.fogLayers.terrain.canvas);
@@ -2872,7 +2935,7 @@ async function syncActiveSceneToMemory() {
   const prev = state.scenes[state.currentSceneId] || {};
   state.scenes[state.currentSceneId] = {
     ...sceneCore,
-    mapBlob: prev.mapBlob || null,
+    ...sceneMapRuntimeFields(prev),
     name: prev.name || '场景 1',
     chapterNumber: sceneChapterNumber(prev),
     chapterTitle: sceneChapterTitle(prev),
@@ -2964,7 +3027,7 @@ async function base64ToBlob(dataUrl) {
   return await res.blob();
 }
 
-async function serializeSceneForBundle(sceneId, scene) {
+async function serializeSceneForBundle(sceneId, scene, opts = {}) {
   if (!scene || !scene.fogLayers?.terrain?.blob || !scene.fogLayers?.event?.blob) {
     throw new Error(`场景"${scene?.name || sceneId || '未命名'}"缺少迷雾数据，无法导出全部场景`);
   }
@@ -2996,7 +3059,9 @@ async function serializeSceneForBundle(sceneId, scene) {
     if (ser.type === 'image') ser.blob = await blobToBase64(ann.blob);
     return ser;
   }));
-  return {
+  const mapSource = Object.prototype.hasOwnProperty.call(opts, 'mapSource') ? opts.mapSource : (scene.mapSource || null);
+  const mapMissing = Object.prototype.hasOwnProperty.call(opts, 'mapMissing') ? opts.mapMissing : Boolean(scene.mapMissing);
+  const payload = {
     sceneId,
     name: scene.name || '场景',
     chapterNumber: sceneChapterNumber(scene),
@@ -3012,6 +3077,9 @@ async function serializeSceneForBundle(sceneId, scene) {
     view: scene.view || null,
     settings: scene.settings || {},
   };
+  if (mapSource) payload.mapSource = mapSource;
+  if (mapMissing || mapSource) payload.mapMissing = Boolean(mapMissing || mapSource?.type === 'placeholder');
+  return payload;
 }
 
 async function exportProject() {
@@ -3032,7 +3100,7 @@ async function exportProject() {
     const payload = {
       format: 'fog-of-war-map.fogbundle',
       schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
-      appVersion: 'v3.12.1',
+      appVersion: CLOUD_SYNC_TOOL_VERSION,
       exportedAt: new Date().toISOString(),
       sceneCount: scenes.length,
       currentSceneId: state.currentSceneId,
@@ -3101,6 +3169,8 @@ async function bundleScenePayloadToSaved(scenePayload) {
     view: scenePayload.view || null,
     settings: scenePayload.settings || {},
     mapFingerprint: scenePayload.mapFingerprint || null,
+    mapMissing: Boolean(scenePayload.mapMissing),
+    mapSource: scenePayload.mapSource || null,
     ts: Date.now(),
   };
 }
@@ -3354,7 +3424,7 @@ async function switchScene(targetId) {
       const prev = state.scenes[state.currentSceneId] || {};
       state.scenes[state.currentSceneId] = {
         ...sceneCore,
-        mapBlob: prev.mapBlob || null,
+        ...sceneMapRuntimeFields(prev),
         mapSize: sceneCore.mapSize,
         name: prev.name || '场景',
         chapterNumber: sceneChapterNumber(prev),
@@ -3365,31 +3435,11 @@ async function switchScene(targetId) {
     }
   }
   const target = state.scenes[targetId];
-  if (!target.mapBlob) {
-    showToast('目标场景无地图，请重新加载地图');
-    state.currentSceneId = targetId;
-    state.hasMap = false;
-    clearAnnotationRuntimeResources();
-    state.tokens = [];
-    state.events = [];
-    state.annotations = [];
-    clearSelection({ render: false });
-    state.undoStack = [];
-    updateTokensStatus();
-    updateEventsStatus();
-    updateAnnotationsStatus();
-    updateUndoButton();
-    $('splash').style.display = 'flex';
-    updateSceneStatus();
-    updateObjectPanel();
-    triggerImmediateSave();
-    return;
-  }
   const prevSceneId = state.currentSceneId;
   const prevHasMap = state.hasMap;
   setLoading('切换场景中…');
   try {
-    const preparedMap = await prepareMapFromBlob(target.mapBlob);
+    const preparedMap = await prepareSceneMapForRestore(target);
     const preparedRestore = await prepareSavedRestore(target, { w: preparedMap.w, h: preparedMap.h });
     const mapInfo = preparedMap;
     commitPreparedMap(preparedMap);
@@ -3405,7 +3455,8 @@ async function switchScene(targetId) {
     setupBrushSizeFromState();
     updateSceneStatus();
     triggerImmediateSave();
-    showToast('已切换到 "' + (target.name || '场景') + '"', 2000);
+    const suffix = sceneNeedsLocalMap(target) ? '（占位地图，需绑定本机原图）' : '';
+    showToast('已切换到 "' + (target.name || '场景') + '"' + suffix, 2600);
   } catch (e) {
     console.error(e);
     // 回滚：保持原 currentSceneId 不变
@@ -3459,12 +3510,12 @@ function openSceneManagerModal() {
     const s = state.scenes[id];
     const isCurrent = (id === state.currentSceneId);
     const name = escapeHtml(s.name || '场景');
-    const hasMap = !!s.mapBlob;
+    const mapLabel = s.mapBlob ? '🗺' : (sceneNeedsLocalMap(s) ? '□ 待绑定地图' : '⚠ 无图');
     const ago = s.lastUsedAt ? Math.max(1, Math.round((Date.now() - s.lastUsedAt) / 60000)) + ' 分钟前' : '';
     return `
       <div class="scene-row ${isCurrent ? 'current' : ''}">
         <span class="scene-name">${isCurrent ? '✓ ' : ''}${name}</span>
-        <span class="scene-meta">${hasMap ? '🗺' : '⚠ 无图'} ${ago}</span>
+        <span class="scene-meta">${mapLabel} ${ago}</span>
         <div class="scene-actions">
           ${isCurrent ? '' : `<button class="scene-switch" data-id="${id}">切换</button>`}
           ${canEditScenes ? `<button class="scene-rename" data-id="${id}">改名</button>` : ''}
@@ -6087,12 +6138,18 @@ async function restoreSceneWithPreparedMap(sceneId, file, preparedMap, nextFinge
     commitPreparedMap(preparedMap);
     state.mapFingerprint = nextFingerprint;
     scene.mapBlob = file;
+    scene.mapMissing = false;
+    scene.mapSource = null;
     scene.mapSize = { w, h };
+    scene.mapFingerprint = nextFingerprint;
     state.currentSceneId = sceneId;
     const restored = await restoreFromSaved(scene, { preparedRestore });
     if (restored) {
       await loadCheckpoints();
       setupBrushSizeFromState();
+      updateSceneStatus();
+      await triggerImmediateSave();
+      showToast('已绑定本机地图并恢复场景', 2600);
     }
   } catch (e) {
     console.error(e);
@@ -6107,7 +6164,10 @@ function resetSceneWithPreparedMap(sceneId, file, preparedMap, nextFingerprint, 
   commitPreparedMap(preparedMap);
   state.mapFingerprint = nextFingerprint;
   scene.mapBlob = file;
+  scene.mapMissing = false;
+  scene.mapSource = null;
   scene.mapSize = { w, h };
+  scene.mapFingerprint = nextFingerprint;
   state.currentSceneId = sceneId;
   clearAnnotationRuntimeResources();
   state.tokens = []; state.events = []; state.annotations = [];
@@ -6131,6 +6191,8 @@ function createSceneWithPreparedMap(file, preparedMap, nextFingerprint, w, h) {
     chapterNumber: DEFAULT_CHAPTER_NUMBER,
     chapterTitle: DEFAULT_CHAPTER_TITLE,
     mapBlob: file,
+    mapMissing: false,
+    mapSource: null,
     mapFingerprint: nextFingerprint,
     mapSize: { w, h },
     createdAt: Date.now(),
@@ -6209,7 +6271,7 @@ async function loadMapFile(file) {
         const prev = state.scenes[state.currentSceneId];
         state.scenes[state.currentSceneId] = {
           ...sceneCore,
-          mapBlob: prev.mapBlob || null,
+          ...sceneMapRuntimeFields(prev),
           mapSize: sceneCore.mapSize,
           name: prev.name || '场景',
           chapterNumber: sceneChapterNumber(prev),
@@ -6224,6 +6286,24 @@ async function loadMapFile(file) {
       const preparedMap = await prepareMapFromBlob(file, { showDownsampleToast: true });
       const w = preparedMap.w, h = preparedMap.h;
       const nextFingerprint = `${file.name}-${file.size}-${file.lastModified || 0}-${w}x${h}`;
+
+      const currentScene = state.currentSceneId ? state.scenes[state.currentSceneId] : null;
+      if (sceneNeedsLocalMap(currentScene)) {
+        const expected = currentScene.mapSize;
+        if (expected.w !== w || expected.h !== h) {
+          hideLoading();
+          showToast(`地图尺寸不一致：需要 ${expected.w}×${expected.h}，当前是 ${w}×${h}`, 5200);
+          return;
+        }
+        hideLoading();
+        showConfirm(
+          '绑定本机地图',
+          `这张图尺寸匹配当前占位场景。绑定后会保留遮罩、Token、事件和标注。`,
+          () => restoreSceneWithPreparedMap(state.currentSceneId, file, preparedMap, nextFingerprint, w, h),
+          { yesText: '绑定', noText: '取消' }
+        );
+        return;
+      }
 
       // v3: 在已有 scenes 中查匹配 fingerprint；同一地图可能对应多个场景，不能静默取第一个。
       const matchedSceneIds = [];
@@ -6431,13 +6511,14 @@ function hideLoading() {
   }
 }
 
-// ============== 云存档（v3.12.1） ==============
+// ============== 云存档（v3.13.0） ==============
 const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.12.2';
-const CLOUD_SYNC_SCHEMA_VERSION = 4;
+const CLOUD_SYNC_TOOL_VERSION = 'v3.13.0';
+const CLOUD_SYNC_SCHEMA_VERSION = 5;
+const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
 const CLOUD_SYNC_MAP_CACHE_PREFIX = 'cloudSync:map:';
 const CLOUD_SYNC_PENDING_PREFIX = 'pending';
@@ -6447,6 +6528,7 @@ const CLOUD_SYNC_ACCEPT_JSON = 'application/vnd.github+json';
 const CLOUD_SYNC_ACCEPT_RAW = 'application/vnd.github.raw+json';
 const CLOUD_SYNC_SINGLE_LIMIT = 1 * 1024 * 1024;
 const CLOUD_SYNC_MAP_OPTIMIZE_THRESHOLD = 8 * 1024 * 1024;
+const CLOUD_SYNC_MAP_PLACEHOLDER_THRESHOLD = 8 * 1024 * 1024;
 const CLOUD_SYNC_MAP_OPTIMIZE_MIME = 'image/webp';
 const CLOUD_SYNC_MAP_OPTIMIZE_QUALITY = 0.88;
 const CLOUD_SYNC_REQUEST_GAP_MS = 100;
@@ -6535,6 +6617,44 @@ function cloudSync_formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+function cloudSync_isPlaceholderMapEntry(entry) {
+  return Boolean(entry && (entry.storage === 'placeholder' || entry.placeholder || entry.requires_local_file));
+}
+function cloudSync_isRemoteMapEntry(entry) {
+  return Boolean(entry && !cloudSync_isPlaceholderMapEntry(entry) && entry.map_sha256 && entry.map_path);
+}
+function cloudSync_buildPlaceholderMapSource(scene, info = {}) {
+  const source = scene?.mapSource && scene.mapSource.type === 'placeholder'
+    ? { ...scene.mapSource }
+    : {};
+  return {
+    type: 'placeholder',
+    reason: info.reason || source.reason || 'large-map-skipped',
+    requiresLocalFile: true,
+    originalBytes: info.originalBytes ?? source.originalBytes ?? (scene?.mapBlob?.size || null),
+    originalMime: info.originalMime || source.originalMime || scene?.mapBlob?.type || '',
+    mapSize: info.mapSize || source.mapSize || scene?.mapSize || null,
+    mapFingerprint: info.mapFingerprint || source.mapFingerprint || scene?.mapFingerprint || null,
+    sceneName: info.sceneName || source.sceneName || scene?.name || '',
+    skippedAt: info.skippedAt || source.skippedAt || new Date().toISOString(),
+  };
+}
+function cloudSync_mapSourceFromManifest(mapMeta) {
+  if (!cloudSync_isPlaceholderMapEntry(mapMeta)) return null;
+  return {
+    type: 'placeholder',
+    reason: mapMeta.reason || 'large-map-skipped',
+    requiresLocalFile: true,
+    originalBytes: mapMeta.original_bytes || null,
+    originalMime: mapMeta.mime || '',
+    mapSize: isValidMapSize({ w: mapMeta.downsampled_w, h: mapMeta.downsampled_h })
+      ? { w: mapMeta.downsampled_w, h: mapMeta.downsampled_h }
+      : null,
+    mapFingerprint: mapMeta.map_fingerprint || null,
+    sceneName: mapMeta.scene_name || '',
+    skippedAt: mapMeta.created_at || null,
+  };
 }
 function cloudSync_setBusy(flag) {
   state.cloudSync.busy = !!flag;
@@ -6698,14 +6818,11 @@ async function cloudSync_putTextFile({ owner, repo, token, path, text, sha = nul
     message: message || `cloud sync update ${path}`,
     content: cloudSync_bytesToBase64(cloudSync_stringToBytes(text)),
   };
-  const headers = {};
   if (sha) {
     body.sha = sha;
-    headers['If-Match'] = sha;
   }
   const response = await cloudSync_fetchApi(`/repos/${owner}/${repo}/contents/${encodedPath}`, {
     method: 'PUT',
-    headers,
     body: JSON.stringify(body),
   }, { owner, repo, token });
   if (!response.ok) throw cloudSync_makeError(await cloudSync_classifyError(response));
@@ -6750,18 +6867,23 @@ async function cloudSync_deleteTree({ owner, repo, token, basePath }) {
     }
   }
 }
-async function cloudSync_serializeStateBundle() {
+async function cloudSync_serializeStateBundle(opts = {}) {
   if (state.gridCalibration) throw cloudSync_makeError({ code: 'gridCalibration', userMessage: '请先完成或取消网格校准。' });
   if (!state.hasMap || !state.currentSceneId) throw cloudSync_makeError({ code: 'noMap', userMessage: '请先加载地图。' });
-  await syncActiveSceneToMemory();
+  if (!opts.skipSync) await syncActiveSceneToMemory();
   const sceneEntries = Object.entries(state.scenes || {});
   if (!sceneEntries.length) throw cloudSync_makeError({ code: 'emptyScenes', userMessage: '没有可上传的场景。' });
   const scenes = [];
   for (const [sceneId, scene] of sceneEntries) {
-    if (!scene || !scene.mapBlob) {
+    const overrideMapSource = opts.mapSourcesBySceneId instanceof Map ? opts.mapSourcesBySceneId.get(sceneId) : null;
+    const willRestoreAsPlaceholder = Boolean(overrideMapSource && overrideMapSource.type === 'placeholder');
+    if (!scene || (!scene.mapBlob && !sceneNeedsLocalMap(scene) && !willRestoreAsPlaceholder)) {
       throw cloudSync_makeError({ code: 'missingMap', userMessage: `场景"${scene?.name || sceneId || '未命名'}"还没有地图，暂时不能上传云端。` });
     }
-    scenes.push(await serializeSceneForBundle(sceneId, scene));
+    scenes.push(await serializeSceneForBundle(sceneId, scene, {
+      mapSource: overrideMapSource || scene.mapSource || null,
+      mapMissing: willRestoreAsPlaceholder || Boolean(scene.mapMissing),
+    }));
   }
   const isDefaultTheme = state.theme === DEFAULT_DARK_THEME;
   return {
@@ -6779,14 +6901,91 @@ async function cloudSync_serializeStateBundle() {
 async function cloudSync_collectMapBlobs() {
   const entries = [];
   for (const [sceneId, scene] of Object.entries(state.scenes || {})) {
-    if (!scene || !scene.mapBlob) {
+    if (!scene || (!scene.mapBlob && !sceneNeedsLocalMap(scene))) {
       throw cloudSync_makeError({ code: 'missingMap', userMessage: `场景"${scene?.name || sceneId || '未命名'}"还没有地图，暂时不能上传云端。` });
     }
+    if (sceneNeedsLocalMap(scene)) {
+      entries.push({
+        sceneId,
+        sceneName: scene.name || '场景',
+        storage: 'placeholder',
+        status: 'skipped',
+        reason: scene.mapSource?.reason || 'local-map-required',
+        sha256: null,
+        blob: null,
+        bytes: null,
+        byteSize: 0,
+        originalByteSize: scene.mapSource?.originalBytes || 0,
+        mime: scene.mapSource?.originalMime || '',
+        originalMime: scene.mapSource?.originalMime || '',
+        mapSize: scene.mapSize || null,
+        mapFingerprint: scene.mapFingerprint || null,
+        mapSource: cloudSync_buildPlaceholderMapSource(scene, { reason: scene.mapSource?.reason || 'local-map-required' }),
+      });
+      continue;
+    }
+    if ((scene.mapBlob.size || 0) > CLOUD_SYNC_MAP_PLACEHOLDER_THRESHOLD) {
+      const source = cloudSync_buildPlaceholderMapSource(scene, {
+        reason: 'large-map-skipped',
+        originalBytes: scene.mapBlob.size || 0,
+        originalMime: scene.mapBlob.type || '',
+        mapSize: scene.mapSize || null,
+        mapFingerprint: scene.mapFingerprint || null,
+        sceneName: scene.name || '场景',
+      });
+      entries.push({
+        sceneId,
+        sceneName: scene.name || '场景',
+        storage: 'placeholder',
+        status: 'skipped',
+        reason: 'large-map-skipped',
+        sha256: null,
+        blob: null,
+        bytes: null,
+        byteSize: 0,
+        originalByteSize: scene.mapBlob.size || 0,
+        mime: scene.mapBlob.type || '',
+        originalMime: scene.mapBlob.type || '',
+        mapSize: scene.mapSize || null,
+        mapFingerprint: scene.mapFingerprint || null,
+        mapSource: source,
+      });
+      continue;
+    }
     const uploadMap = await cloudSync_prepareUploadMapBlob(scene.mapBlob, scene.mapSize || null);
+    if ((uploadMap.blob.size || 0) > CLOUD_SYNC_MAP_PLACEHOLDER_THRESHOLD) {
+      const source = cloudSync_buildPlaceholderMapSource(scene, {
+        reason: 'large-map-skipped',
+        originalBytes: uploadMap.originalByteSize || scene.mapBlob.size || 0,
+        originalMime: uploadMap.originalMime || scene.mapBlob.type || '',
+        mapSize: uploadMap.mapSize || scene.mapSize || null,
+        mapFingerprint: scene.mapFingerprint || null,
+        sceneName: scene.name || '场景',
+      });
+      entries.push({
+        sceneId,
+        sceneName: scene.name || '场景',
+        storage: 'placeholder',
+        status: 'skipped',
+        reason: source.reason,
+        sha256: null,
+        blob: null,
+        bytes: null,
+        byteSize: 0,
+        originalByteSize: uploadMap.originalByteSize || scene.mapBlob.size || 0,
+        mime: uploadMap.originalMime || scene.mapBlob.type || '',
+        originalMime: uploadMap.originalMime || scene.mapBlob.type || '',
+        mapSize: uploadMap.mapSize || scene.mapSize || null,
+        mapFingerprint: scene.mapFingerprint || null,
+        mapSource: source,
+      });
+      continue;
+    }
     const bytes = await cloudSync_blobToBytes(uploadMap.blob);
     entries.push({
       sceneId,
       sceneName: scene.name || '场景',
+      storage: 'remote',
       sha256: await cloudSync_sha256(bytes),
       blob: uploadMap.blob,
       bytes,
@@ -6795,6 +6994,7 @@ async function cloudSync_collectMapBlobs() {
       mime: uploadMap.blob.type || uploadMap.originalMime || 'application/octet-stream',
       originalMime: uploadMap.originalMime || scene.mapBlob.type || '',
       mapSize: uploadMap.mapSize || scene.mapSize || null,
+      mapFingerprint: scene.mapFingerprint || null,
       optimized: uploadMap.optimized,
     });
   }
@@ -6840,10 +7040,13 @@ async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
   for (const scenePayload of bundleJson.scenes) {
     const sceneId = scenePayload.sceneId || uuid();
     const mapBlob = mapBlobsBySceneId[sceneId];
-    if (!mapBlob) {
+    const canUsePlaceholder = !mapBlob && Boolean(scenePayload.mapSource?.type === 'placeholder' || scenePayload.mapMissing);
+    if (!mapBlob && !canUsePlaceholder) {
       throw cloudSync_makeError({ code: 'missingMapBlob', userMessage: `云端场景"${scenePayload.name || sceneId}"缺少地图原图。` });
     }
-    const preparedMap = await prepareMapFromBlob(mapBlob);
+    const preparedMap = mapBlob
+      ? await prepareMapFromBlob(mapBlob)
+      : createPlaceholderPreparedMap(scenePayload.mapSize, '云端占位地图');
     if (scenePayload.mapSize && (scenePayload.mapSize.w !== preparedMap.w || scenePayload.mapSize.h !== preparedMap.h)) {
       throw cloudSync_makeError({ code: 'mapSizeMismatch', userMessage: `云端场景"${scenePayload.name || sceneId}"地图尺寸不匹配。` });
     }
@@ -6856,7 +7059,14 @@ async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
       preparedMap,
       scene: {
         ...saved,
-        mapBlob,
+        mapBlob: mapBlob || null,
+        mapMissing: !mapBlob,
+        mapSource: mapBlob ? null : (scenePayload.mapSource || cloudSync_buildPlaceholderMapSource(saved, {
+          reason: 'local-map-required',
+          mapSize: scenePayload.mapSize || { w: preparedMap.w, h: preparedMap.h },
+          mapFingerprint: scenePayload.mapFingerprint || null,
+          sceneName: scenePayload.name || '',
+        })),
         mapFingerprint: scenePayload.mapFingerprint || null,
         mapSize: { w: preparedMap.w, h: preparedMap.h },
         name: scenePayload.name || '导入场景',
@@ -6917,7 +7127,7 @@ function cloudSync_buildManifest({ snapshotId, mapsList, stateChunks, bundleJson
   const tokenCount = scenes.reduce((sum, scene) => sum + ((scene.tokens || []).length), 0);
   const eventCount = scenes.reduce((sum, scene) => sum + ((scene.events || []).length), 0);
   const annotationCount = scenes.reduce((sum, scene) => sum + ((scene.annotations || []).length), 0);
-  const uniqueSha = new Set(mapsList.map((item) => item.sha256));
+  const uniqueSha = new Set(mapsList.filter((item) => item.storage !== 'placeholder' && item.sha256).map((item) => item.sha256));
   return {
     schemaVersion: CLOUD_SYNC_SCHEMA_VERSION,
     snapshot_id: snapshotId,
@@ -6929,7 +7139,8 @@ function cloudSync_buildManifest({ snapshotId, mapsList, stateChunks, bundleJson
     note: String(note || '').trim(),
     locked: !!locked,
     scene_count: scenes.length,
-    map_count: scenes.length,
+    map_count: mapsList.length,
+    map_placeholder_count: mapsList.filter((item) => item.storage === 'placeholder').length,
     token_count: tokenCount,
     annotation_count: annotationCount,
     event_count: eventCount,
@@ -6945,21 +7156,29 @@ function cloudSync_buildManifest({ snapshotId, mapsList, stateChunks, bundleJson
     })),
     state_compression: compression,
     state_chunk_size_bytes: CLOUD_SYNC_SINGLE_LIMIT,
-    maps: mapsList.map((item) => ({
-      scene_id: item.sceneId,
-      scene_name: item.sceneName,
-      map_sha256: item.sha256,
-      map_path: `${cloudSync_mapBasePath(item.sha256)}/`,
-      mime: item.mime,
-      original_bytes: item.originalByteSize || item.byteSize,
-      stored_bytes: item.byteSize,
-      optimized: !!item.optimized,
-      downsampled_w: item.mapSize?.w || null,
-      downsampled_h: item.mapSize?.h || null,
-      map_chunk_count: item.chunkCount || 1,
-      created_at: new Date().toISOString(),
-      status: item.status || 'pending',
-    })),
+    maps: mapsList.map((item) => {
+      const isPlaceholder = item.storage === 'placeholder';
+      return {
+        scene_id: item.sceneId,
+        scene_name: item.sceneName,
+        storage: isPlaceholder ? 'placeholder' : 'remote',
+        placeholder: isPlaceholder,
+        requires_local_file: isPlaceholder,
+        reason: isPlaceholder ? (item.reason || item.mapSource?.reason || 'large-map-skipped') : null,
+        map_sha256: isPlaceholder ? null : item.sha256,
+        map_path: isPlaceholder ? null : `${cloudSync_mapBasePath(item.sha256)}/`,
+        map_fingerprint: item.mapFingerprint || null,
+        mime: item.mime,
+        original_bytes: item.originalByteSize || item.byteSize || 0,
+        stored_bytes: isPlaceholder ? 0 : item.byteSize,
+        optimized: !isPlaceholder && !!item.optimized,
+        downsampled_w: item.mapSize?.w || null,
+        downsampled_h: item.mapSize?.h || null,
+        map_chunk_count: isPlaceholder ? 0 : (item.chunkCount || 1),
+        created_at: new Date().toISOString(),
+        status: item.status || (isPlaceholder ? 'skipped' : 'pending'),
+      };
+    }),
     maps_total_bytes: Array.from(uniqueSha).reduce((sum, sha) => {
       const entry = mapsList.find((item) => item.sha256 === sha);
       return sum + (entry ? entry.byteSize : 0);
@@ -6969,12 +7188,16 @@ function cloudSync_buildManifest({ snapshotId, mapsList, stateChunks, bundleJson
   };
 }
 function cloudSync_parseManifest(json) {
-  if (!json || json.schemaVersion !== CLOUD_SYNC_SCHEMA_VERSION) {
+  if (!json || !CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS.has(json.schemaVersion)) {
     throw cloudSync_makeError({ code: 'manifestInvalid', userMessage: '云端 manifest 版本不正确。' });
   }
   if (!json.snapshot_id || !Array.isArray(json.state_chunks) || !json.state_chunks.length || !Array.isArray(json.maps)) {
     throw cloudSync_makeError({ code: 'manifestInvalid', userMessage: '云端 manifest 内容不完整。' });
   }
+  json.maps = json.maps.map((item) => ({
+    ...item,
+    storage: cloudSync_isPlaceholderMapEntry(item) ? 'placeholder' : 'remote',
+  }));
   return json;
 }
 async function cloudSync_checkMapExists({ owner, repo, token, sha256 }) {
@@ -7139,6 +7362,7 @@ async function cloudSync_updateDraftSha({ owner, repo, token, snapshotId, manife
   draftShaRef.value = updated && updated.sha ? updated.sha : draftShaRef.value;
 }
 function cloudSync_mergeMapStatus(manifest, sha256, status) {
+  if (!sha256) return;
   for (const item of manifest.maps) {
     if (item.map_sha256 === sha256) item.status = status;
   }
@@ -7146,6 +7370,7 @@ function cloudSync_mergeMapStatus(manifest, sha256, status) {
 function cloudSync_buildUniqueMapPlan(mapsList) {
   const bySha = new Map();
   for (const item of mapsList) {
+    if (item.storage === 'placeholder' || !item.sha256) continue;
     let plan = bySha.get(item.sha256);
     if (!plan) {
       plan = {
@@ -7168,11 +7393,18 @@ function cloudSync_buildUniqueMapPlan(mapsList) {
   return Array.from(bySha.values());
 }
 async function cloudSync_prepareUploadPlan({ snapshotId, note }) {
-  const bundleJson = await cloudSync_serializeStateBundle();
+  await syncActiveSceneToMemory();
+  const mapsList = await cloudSync_collectMapBlobs();
+  const mapSourcesBySceneId = new Map();
+  for (const item of mapsList) {
+    if (item.storage === 'placeholder' && item.mapSource) {
+      mapSourcesBySceneId.set(item.sceneId, item.mapSource);
+    }
+  }
+  const bundleJson = await cloudSync_serializeStateBundle({ mapSourcesBySceneId, skipSync: true });
   const bundleBytes = cloudSync_stringToBytes(JSON.stringify(bundleJson));
   const compressedInfo = await cloudSync_compressStateBundleBytes(bundleBytes);
   const stateChunks = await cloudSync_prepareStateChunks(compressedInfo.bytes, compressedInfo.compression);
-  const mapsList = await cloudSync_collectMapBlobs();
   const uniqueMaps = cloudSync_buildUniqueMapPlan(mapsList);
   for (const entry of uniqueMaps) {
     entry.chunks = await cloudSync_prepareMapChunks(entry);
@@ -7230,7 +7462,6 @@ async function cloudSync_uploadPrepared({ owner, repo, token, snapshotId, note, 
   setLoading('上传状态数据...', { onCancel: () => controller.abort() });
   await cloudSync_uploadStateChunks({ owner, repo, token, snapshotId, chunks: stateChunks, controller });
   manifest.state_chunks.forEach((chunk) => { chunk.status = 'uploaded'; });
-  await cloudSync_updateDraftSha({ owner, repo, token, snapshotId, manifest, draftShaRef });
   manifest.maps_reused_count = reused;
   manifest.maps_new_count = uploaded;
   setLoading('写入快照清单...', { onCancel: () => controller.abort() });
@@ -7253,7 +7484,9 @@ async function cloudSync_uploadPrepared({ owner, repo, token, snapshotId, note, 
   state.cloudSync.draftSnapshotId = null;
   cloudSync_clearPendingBanner();
   hideLoading();
-  showToast(`上传完成 ✓ 复用 ${reused} 张已有地图,新上传 ${uploaded} 张`, 4200);
+  const skipped = mapsList.filter((item) => item.storage === 'placeholder').length;
+  const skippedText = skipped ? `，${skipped} 张大地图仅保存占位` : '';
+  showToast(`上传完成 ✓ 复用 ${reused} 张已有地图,新上传 ${uploaded} 张${skippedText}`, 5200);
   return { ok: true, reused, uploaded, manifest, bundleJson, mapsList };
 }
 function cloudSync_showConflictDialog(remoteLatest, onOverwrite, onDownloadRemote) {
@@ -7451,10 +7684,24 @@ async function cloudSync_restoreSnapshot({ owner, repo, token, snapshotId }) {
     const manifest = await cloudSync_loadSnapshotManifest({ owner, repo, token, snapshotId });
     const bundleJson = await cloudSync_downloadStateBundleFromManifest({ owner, repo, token, manifest });
     const mapBlobsBySceneId = {};
-    for (let i = 0; i < manifest.maps.length; i++) {
-      const mapMeta = manifest.maps[i];
-      setLoading(`下载地图... ${i + 1}/${manifest.maps.length}`);
+    const remoteMaps = manifest.maps.filter(cloudSync_isRemoteMapEntry);
+    for (let i = 0; i < remoteMaps.length; i++) {
+      const mapMeta = remoteMaps[i];
+      setLoading(`下载地图... ${i + 1}/${remoteMaps.length}`);
       mapBlobsBySceneId[mapMeta.scene_id] = await cloudSync_downloadMapBlob({ owner, repo, token, mapMeta });
+    }
+    const mapSourceBySceneId = new Map();
+    for (const mapMeta of manifest.maps) {
+      const source = cloudSync_mapSourceFromManifest(mapMeta);
+      if (source) mapSourceBySceneId.set(mapMeta.scene_id, source);
+    }
+    if (mapSourceBySceneId.size) {
+      for (const scenePayload of bundleJson.scenes || []) {
+        const source = mapSourceBySceneId.get(scenePayload.sceneId);
+        if (!source) continue;
+        scenePayload.mapSource = scenePayload.mapSource || source;
+        scenePayload.mapMissing = true;
+      }
     }
     try {
       state.cloudSync.localDraftBeforeOverwrite = await cloudSync_serializeStateBundle();
@@ -7467,7 +7714,8 @@ async function cloudSync_restoreSnapshot({ owner, repo, token, snapshotId }) {
     state.cloudSync.lastSnapshotId = manifest.snapshot_id;
     state.cloudSync.lastError = null;
     hideLoading();
-    showToast('已读取云端进度 ✓', 3500);
+    const placeholderCount = mapSourceBySceneId.size;
+    showToast(placeholderCount ? `已读取云端进度 ✓ ${placeholderCount} 张大地图需绑定本机原图` : '已读取云端进度 ✓', 5200);
     return true;
   } catch (err) {
     hideLoading();
@@ -7550,26 +7798,13 @@ async function cloudSync_resumeDraft({ owner, repo, token, snapshotId }) {
   });
   const draftManifest = cloudSync_parseManifest(draftFile.json);
   const note = draftManifest.note || '';
-  const prepared = await cloudSync_prepareUploadPlan({ snapshotId, note });
-  for (const chunk of prepared.stateChunks) {
-    const saved = draftManifest.state_chunks.find((item) => item.index === chunk.index);
-    if (saved && saved.status === 'uploaded') chunk.status = 'uploaded';
-  }
-  for (const unique of prepared.uniqueMaps) {
-    const manifestMaps = draftManifest.maps.filter((item) => item.map_sha256 === unique.sha256);
-    if (manifestMaps.some((item) => item.status === 'uploaded')) {
-      unique.exists = true;
-      unique.status = 'reused';
-    }
-  }
-  prepared.manifest = draftManifest;
+  await cloudSync_deleteTree({ owner, repo, token, basePath: `${CLOUD_SYNC_PENDING_PREFIX}/${snapshotId}` });
   return await cloudSync_uploadCurrent({
     owner,
     repo,
     token,
     note,
     snapshotId,
-    preparedPlan: prepared,
   });
 }
 async function cloudSync_discardDraft({ owner, repo, token, draftSnapshotId }) {
@@ -7598,8 +7833,11 @@ async function cloudSync_runGC({ owner, repo, token }) {
     const keepSnapshots = snapshots.slice(0, 30);
     const keepSnapshotIds = new Set(keepSnapshots.map((item) => item.snapshot_id));
     const keepMaps = new Set();
-    for (const manifest of keepSnapshots) {
-      for (const map of manifest.maps || []) keepMaps.add(map.map_sha256);
+    for (const manifest of snapshots) {
+      if (!keepSnapshotIds.has(manifest.snapshot_id) && !manifest.locked) continue;
+      for (const map of manifest.maps || []) {
+        if (cloudSync_isRemoteMapEntry(map)) keepMaps.add(map.map_sha256);
+      }
     }
     let deletedSnapshots = 0;
     let deletedMaps = 0;
@@ -8377,6 +8615,95 @@ function openAnnotationEditDialog(annotationId) {
   else openTextAnnotationDialog(annotationId);
 }
 
+function eventQuickMatches(ev, query) {
+  if (!query) return true;
+  return [
+    ev.title || '',
+    ev.content || '',
+    ev.icon?.type === 'emoji' ? ev.icon.value : '',
+    ev.layer === 0 ? '公开 显露 上层' : '隐藏 事件雾 遮罩',
+  ].join(' ').toLowerCase().includes(query);
+}
+
+function eventQuickLayerLabel(ev) {
+  return ev.layer === 0 ? '遮罩上层' : '事件遮罩下';
+}
+
+function renderEventQuickList(query = '') {
+  const list = $('event-quick-list');
+  if (!list) return;
+  const q = String(query || '').trim().toLowerCase();
+  const matches = state.events
+    .filter((ev) => eventQuickMatches(ev, q))
+    .sort((a, b) => (b.zOrder || 0) - (a.zOrder || 0));
+  if (!state.events.length) {
+    list.innerHTML = '<div class="object-empty">当前场景还没有事件。</div>';
+    return;
+  }
+  if (!matches.length) {
+    list.innerHTML = '<div class="object-empty">没有匹配的事件。</div>';
+    return;
+  }
+  list.innerHTML = matches.map((ev) => {
+    const title = ev.title || '（未命名事件）';
+    const icon = ev.icon?.type === 'emoji' ? (ev.icon.value || '◆') : '◆';
+    const action = ev.layer === 0 ? '放回遮罩下' : '显露到上层';
+    const actionClass = ev.layer === 0 ? '' : 'primary';
+    return `
+      <div class="scene-row event-quick-row" data-event-id="${escapeHtml(ev.id)}">
+        <span class="object-thumb">${escapeHtml(icon)}</span>
+        <span class="object-main">
+          <span class="object-name">${escapeHtml(title)}</span>
+          <span class="object-sub">${escapeHtml(eventQuickLayerLabel(ev))} · ${Math.round(ev.x)}, ${Math.round(ev.y)}</span>
+        </span>
+        <div class="scene-actions">
+          <button class="event-quick-locate" data-id="${escapeHtml(ev.id)}">定位</button>
+          <button class="event-quick-toggle ${actionClass}" data-id="${escapeHtml(ev.id)}">${action}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  document.querySelectorAll('.event-quick-locate').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setSelectedObject('event', btn.dataset.id, { locate: true, render: true });
+    });
+  });
+  document.querySelectorAll('.event-quick-toggle').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const ev = state.events.find((item) => item.id === btn.dataset.id);
+      if (!ev) return;
+      const nextLayer = ev.layer === 0 ? 1 : 0;
+      await modifyEvent(ev.id, { layer: nextLayer });
+      renderEventQuickList($('event-quick-search')?.value || '');
+      showToast(nextLayer === 0 ? '事件已显露到遮罩上层' : '事件已放回事件遮罩下', 2200);
+    });
+  });
+}
+
+function openEventQuickToggleModal() {
+  if (!state.hasMap) { showToast('请先加载地图'); return; }
+  if (!requireEditSurface()) return;
+  showModal(`
+    <div class="modal-title">事件快切</div>
+    <div class="modal-desc">搜索事件并快速切换它在遮罩上层或事件遮罩下。此处不编辑事件内容。</div>
+    <div class="form-row">
+      <input id="event-quick-search" type="search" placeholder="搜索标题、内容或图标">
+    </div>
+    <div class="scene-list" id="event-quick-list"></div>
+    <div class="modal-actions">
+      <button id="event-quick-close">关闭</button>
+    </div>
+  `, {
+    onMounted: () => {
+      const input = $('event-quick-search');
+      input.addEventListener('input', () => renderEventQuickList(input.value));
+      $('event-quick-close').addEventListener('click', closeModal);
+      renderEventQuickList('');
+      input.focus();
+    }
+  });
+}
+
 // ============== 下拉菜单 ==============
 function showDropdown() {
   if (state.gridCalibration) {
@@ -8391,6 +8718,11 @@ function showDropdown() {
   cloudBtn.id = 'btn-more-cloud-sync';
   cloudBtn.addEventListener('click', () => { hideDropdown(); openCloudSyncModal(); });
   menu.appendChild(cloudBtn);
+  if (isEditSurface()) {
+    const eventQuickBtn = mkMenuItem('◆ 事件快切');
+    eventQuickBtn.addEventListener('click', () => { hideDropdown(); openEventQuickToggleModal(); });
+    menu.appendChild(eventQuickBtn);
+  }
   appendMenuDivider(menu);
 
   const layerLabel = state.currentLayer === 'terrain' ? '地形层' : '事件层';
@@ -8726,14 +9058,16 @@ async function tryAutoLoadCurrentScene() {
   if (!id || !state.scenes[id]) return;
   const scene = state.scenes[id];
   if (!scene.mapBlob) {
-    // v2 迁移过来无 mapBlob —— 等用户加载地图
-    showToast('上次场景需要重新加载地图（升级后图片需重选）', 5000);
-    return;
+    if (!sceneNeedsLocalMap(scene)) {
+      // v2 迁移过来无 mapBlob —— 等用户加载地图
+      showToast('上次场景需要重新加载地图（升级后图片需重选）', 5000);
+      return;
+    }
   }
   // 自动加载图 + 恢复 scene
   setLoading('恢复场景中…');
   try {
-    const preparedMap = await prepareMapFromBlob(scene.mapBlob);
+    const preparedMap = await prepareSceneMapForRestore(scene);
     const preparedRestore = await prepareSavedRestore(scene, { w: preparedMap.w, h: preparedMap.h });
     const mapInfo = preparedMap;
     commitPreparedMap(preparedMap);
@@ -8745,7 +9079,8 @@ async function tryAutoLoadCurrentScene() {
     await loadCheckpoints();
     fitView();
     setupBrushSizeFromState();
-    showToast('已恢复场景 "' + (scene.name || '场景') + '"', 2500);
+    const suffix = sceneNeedsLocalMap(scene) ? '（占位地图，需绑定本机原图）' : '';
+    showToast('已恢复场景 "' + (scene.name || '场景') + '"' + suffix, 3600);
   } catch (e) {
     console.error(e);
     showToast('恢复场景失败：' + e.message);
