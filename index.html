@@ -3032,7 +3032,7 @@ async function exportProject() {
     const payload = {
       format: 'fog-of-war-map.fogbundle',
       schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
-      appVersion: 'v3.10.0',
+      appVersion: 'v3.12.1',
       exportedAt: new Date().toISOString(),
       sceneCount: scenes.length,
       currentSceneId: state.currentSceneId,
@@ -6431,12 +6431,12 @@ function hideLoading() {
   }
 }
 
-// ============== 云存档（v3.10.0） ==============
+// ============== 云存档（v3.12.1） ==============
 const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.10.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.12.1';
 const CLOUD_SYNC_SCHEMA_VERSION = 4;
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
 const CLOUD_SYNC_MAP_CACHE_PREFIX = 'cloudSync:map:';
@@ -6445,7 +6445,10 @@ const CLOUD_SYNC_SNAPSHOTS_PREFIX = 'snapshots';
 const CLOUD_SYNC_MAPS_PREFIX = 'maps';
 const CLOUD_SYNC_ACCEPT_JSON = 'application/vnd.github+json';
 const CLOUD_SYNC_ACCEPT_RAW = 'application/vnd.github.raw+json';
-const CLOUD_SYNC_SINGLE_LIMIT = 20 * 1024 * 1024;
+const CLOUD_SYNC_SINGLE_LIMIT = 4 * 1024 * 1024;
+const CLOUD_SYNC_MAP_OPTIMIZE_THRESHOLD = 8 * 1024 * 1024;
+const CLOUD_SYNC_MAP_OPTIMIZE_MIME = 'image/webp';
+const CLOUD_SYNC_MAP_OPTIMIZE_QUALITY = 0.88;
 const CLOUD_SYNC_REQUEST_GAP_MS = 100;
 
 function cloudSync_getToken() {
@@ -6779,19 +6782,52 @@ async function cloudSync_collectMapBlobs() {
     if (!scene || !scene.mapBlob) {
       throw cloudSync_makeError({ code: 'missingMap', userMessage: `场景"${scene?.name || sceneId || '未命名'}"还没有地图，暂时不能上传云端。` });
     }
-    const bytes = await cloudSync_blobToBytes(scene.mapBlob);
+    const uploadMap = await cloudSync_prepareUploadMapBlob(scene.mapBlob, scene.mapSize || null);
+    const bytes = await cloudSync_blobToBytes(uploadMap.blob);
     entries.push({
       sceneId,
       sceneName: scene.name || '场景',
       sha256: await cloudSync_sha256(bytes),
-      blob: scene.mapBlob,
+      blob: uploadMap.blob,
       bytes,
-      byteSize: scene.mapBlob.size || bytes.length,
-      mime: scene.mapBlob.type || 'application/octet-stream',
-      mapSize: scene.mapSize || null,
+      byteSize: uploadMap.blob.size || bytes.length,
+      originalByteSize: uploadMap.originalByteSize,
+      mime: uploadMap.blob.type || uploadMap.originalMime || 'application/octet-stream',
+      originalMime: uploadMap.originalMime || scene.mapBlob.type || '',
+      mapSize: uploadMap.mapSize || scene.mapSize || null,
+      optimized: uploadMap.optimized,
     });
   }
   return entries;
+}
+function cloudSync_canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), type, quality));
+}
+async function cloudSync_prepareUploadMapBlob(blob, mapSize) {
+  const originalByteSize = blob.size || 0;
+  const originalMime = blob.type || 'application/octet-stream';
+  const prepared = await prepareMapFromBlob(blob);
+  const preparedSize = { w: prepared.w, h: prepared.h };
+  const geometry = mapSize || preparedSize;
+  const geometryMatchesPrepared = geometry.w === prepared.w && geometry.h === prepared.h;
+  const shouldOptimize = originalByteSize > CLOUD_SYNC_MAP_OPTIMIZE_THRESHOLD || prepared.downsampled || !geometryMatchesPrepared;
+  if (!shouldOptimize) {
+    return { blob, originalByteSize, originalMime, mapSize: geometry, optimized: false };
+  }
+  let optimizedBlob = await cloudSync_canvasToBlob(prepared.canvas, CLOUD_SYNC_MAP_OPTIMIZE_MIME, CLOUD_SYNC_MAP_OPTIMIZE_QUALITY);
+  if (!optimizedBlob || !optimizedBlob.size) {
+    optimizedBlob = await cloudSync_canvasToBlob(prepared.canvas, 'image/png');
+  }
+  if (!optimizedBlob || !optimizedBlob.size) {
+    return { blob, originalByteSize, originalMime, mapSize: geometry, optimized: false };
+  }
+  return {
+    blob: optimizedBlob,
+    originalByteSize,
+    originalMime,
+    mapSize: preparedSize,
+    optimized: true,
+  };
 }
 async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
   if (!bundleJson || bundleJson.format !== 'fog-of-war-map.fogbundle') {
@@ -6915,7 +6951,9 @@ function cloudSync_buildManifest({ snapshotId, mapsList, stateChunks, bundleJson
       map_sha256: item.sha256,
       map_path: `${cloudSync_mapBasePath(item.sha256)}/`,
       mime: item.mime,
-      original_bytes: item.byteSize,
+      original_bytes: item.originalByteSize || item.byteSize,
+      stored_bytes: item.byteSize,
+      optimized: !!item.optimized,
       downsampled_w: item.mapSize?.w || null,
       downsampled_h: item.mapSize?.h || null,
       map_chunk_count: item.chunkCount || 1,
@@ -6994,18 +7032,24 @@ async function cloudSync_putDraftManifest({ owner, repo, token, snapshotId, mani
   });
 }
 async function cloudSync_uploadMapChunked({ owner, repo, token, mapEntry, controller }) {
-  const originalBytes = mapEntry.byteSize || 0;
+  const originalBytes = mapEntry.originalByteSize || mapEntry.byteSize || 0;
   const chunks = mapEntry.chunks || await cloudSync_prepareMapChunks(mapEntry);
   for (const chunk of chunks) {
     cloudSync_assertNotAborted(controller);
-    await cloudSync_putTextFile({
-      owner,
-      repo,
-      token,
-      path: `${cloudSync_mapBasePath(mapEntry.sha256)}/chunks/${cloudSync_chunkName(chunk.index)}`,
-      text: chunk.base64,
-      message: `cloud sync upload map chunk ${mapEntry.sha256}#${chunk.index}`,
-    });
+    const chunkPath = `${cloudSync_mapBasePath(mapEntry.sha256)}/chunks/${cloudSync_chunkName(chunk.index)}`;
+    let chunkExists = false;
+    try { chunkExists = await cloudSync_headContent({ owner, repo, token, path: chunkPath }); }
+    catch (_) { chunkExists = false; }
+    if (!chunkExists) {
+      await cloudSync_putTextFile({
+        owner,
+        repo,
+        token,
+        path: chunkPath,
+        text: chunk.base64,
+        message: `cloud sync upload map chunk ${mapEntry.sha256}#${chunk.index}`,
+      });
+    }
     chunk.status = 'uploaded';
     await cloudSync_sleep(CLOUD_SYNC_REQUEST_GAP_MS);
   }
@@ -7019,6 +7063,8 @@ async function cloudSync_uploadMapChunked({ owner, repo, token, mapEntry, contro
       sha256: mapEntry.sha256,
       mime: mapEntry.mime || mapEntry.blob.type || 'application/octet-stream',
       originalBytes,
+      storedBytes: mapEntry.byteSize || 0,
+      optimized: !!mapEntry.optimized,
       chunkCount: chunks.length,
       downsampledW: mapEntry.mapSize?.w || null,
       downsampledH: mapEntry.mapSize?.h || null,
@@ -7107,8 +7153,11 @@ function cloudSync_buildUniqueMapPlan(mapsList) {
         blob: item.blob,
         bytes: item.bytes,
         byteSize: item.byteSize,
+        originalByteSize: item.originalByteSize,
         mime: item.mime,
+        originalMime: item.originalMime,
         mapSize: item.mapSize,
+        optimized: item.optimized,
         sceneNames: [item.sceneName],
       };
       bySha.set(item.sha256, plan);
@@ -7127,16 +7176,22 @@ async function cloudSync_prepareUploadPlan({ snapshotId, note }) {
   const uniqueMaps = cloudSync_buildUniqueMapPlan(mapsList);
   for (const entry of uniqueMaps) {
     entry.chunks = await cloudSync_prepareMapChunks(entry);
+    entry.chunkCount = entry.chunks.length;
   }
+  const chunkCountBySha = new Map(uniqueMaps.map((entry) => [entry.sha256, entry.chunkCount || 1]));
+  const mapsPlan = mapsList.map((item) => ({
+    ...item,
+    chunkCount: chunkCountBySha.get(item.sha256) || 1,
+  }));
   const manifest = cloudSync_buildDraftManifest({
     snapshotId,
     note,
     bundleJson,
     stateCompression: compressedInfo.compression,
     stateChunks,
-    mapsPlan: mapsList,
+    mapsPlan,
   });
-  return { bundleJson, stateChunks, mapsList, uniqueMaps, manifest, compression: compressedInfo.compression };
+  return { bundleJson, stateChunks, mapsList: mapsPlan, uniqueMaps, manifest, compression: compressedInfo.compression };
 }
 async function cloudSync_uploadPrepared({ owner, repo, token, snapshotId, note, preparedPlan, draftShaRef, controller }) {
   const { bundleJson, stateChunks, mapsList, uniqueMaps, manifest, compression } = preparedPlan;
@@ -7351,7 +7406,19 @@ async function cloudSync_downloadStateBundleFromManifest({ owner, repo, token, m
 async function cloudSync_downloadMapBlob({ owner, repo, token, mapMeta }) {
   let blob = await cloudSync_readCachedMap(mapMeta.map_sha256);
   if (blob) return blob;
-  const chunkCount = mapMeta.map_chunk_count || 1;
+  let chunkCount = mapMeta.map_chunk_count || 1;
+  if (chunkCount <= 1 && mapMeta.map_path) {
+    try {
+      const chunkEntries = await cloudSync_listContents({ owner, repo, token, path: `${mapMeta.map_path}chunks`, allowMissing: true });
+      const indexes = chunkEntries
+        .filter((entry) => entry.type === 'file' && /^\d{4}\.bin\.b64$/.test(entry.name || ''))
+        .map((entry) => parseInt(String(entry.name).slice(0, 4), 10))
+        .filter((index) => Number.isFinite(index));
+      if (indexes.length) chunkCount = Math.max(chunkCount, Math.max(...indexes) + 1);
+    } catch (err) {
+      console.warn('cloudSync list map chunks fallback failed:', err);
+    }
+  }
   const parts = [];
   for (let i = 0; i < chunkCount; i++) {
     const chunkText = await cloudSync_getRawTextFile({
