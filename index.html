@@ -262,10 +262,19 @@ button.icon { padding: 6px 10px; }
   align-items: center;
   gap: 8px;
 }
+.object-panel-header > div {
+  min-width: 0;
+}
 .object-panel-title { font-weight: 600; }
 .object-panel-meta {
   color: var(--theme-text-muted);
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#object-panel-live {
+  flex: 0 0 auto;
 }
 .object-panel-tools {
   border-bottom: 1px solid var(--theme-bg-input);
@@ -493,8 +502,10 @@ button.icon { padding: 6px 10px; }
   padding: 0 12px;
   border-top: 1px solid var(--theme-bg-input);
 }
-#app.present-mode.placing-event #status-bar > .seg { display: none; }
-#app.present-mode.placing-event #status-bar > #status-place-event { display: inline; }
+#app.present-mode.placing-event #status-bar > :not(.status-right-group) { display: none; }
+#app.present-mode.placing-event .status-right-group > :not(#status-place-event) { display: none; }
+#app.present-mode.placing-event .status-right-group { margin-left: 0; }
+#app.present-mode.placing-event #status-place-event { display: inline; }
 
 /* ============== Dropdown menu ============== */
 #dropdown-menu {
@@ -876,13 +887,698 @@ input[type="number"] {
     bottom: 8px;
   }
 }
+/* ============== v3.8 visual shell: pure CSS brass console ============== */
+:root {
+  --art-bg: #030201;
+  --art-obsidian: #070604;
+  --art-top: #120d08;
+  --art-top-deep: #090705;
+  --art-walnut: #24170d;
+  --art-walnut-deep: #110b07;
+  --art-brass-hi: #d6b06a;
+  --art-brass: #9d7539;
+  --art-brass-dim: #5b4325;
+  --art-brass-dark: #25190d;
+  --art-ivory: #f1dfbd;
+  --art-muted: #9f8b66;
+  --art-red: #9b2d2d;
+  --art-panel: #15100b;
+  --art-panel-2: #21160f;
+  --art-glow: rgba(214,176,106,0.28);
+}
+body {
+  background: #030201;
+  color: var(--art-ivory);
+}
+#app {
+  background:
+    radial-gradient(circle at 50% 44%, rgba(154,113,49,0.08), transparent 35%),
+    linear-gradient(180deg, #070604 0%, #020201 100%);
+}
+#toolbar {
+  min-height: 70px;
+  padding: 10px 12px;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(214,176,106,0.13), transparent 18%),
+    radial-gradient(circle at 82% 0%, rgba(214,176,106,0.10), transparent 22%),
+    linear-gradient(180deg, rgba(255,235,186,0.08) 0%, transparent 18%),
+    repeating-linear-gradient(90deg, rgba(214,176,106,0.08) 0 1px, transparent 1px 19px),
+    repeating-linear-gradient(0deg, rgba(255,245,210,0.025) 0 1px, transparent 1px 8px),
+    linear-gradient(180deg, #1a120b 0%, #100b07 54%, #070504 100%);
+  border-bottom: 1px solid rgba(157,117,57,0.72);
+  box-shadow:
+    inset 0 1px rgba(255,232,178,0.22),
+    inset 0 -1px rgba(0,0,0,0.8),
+    0 8px 24px rgba(0,0,0,0.52);
+  scrollbar-width: none;
+}
+#toolbar::-webkit-scrollbar { display: none; }
+#toolbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(214,176,106,0.58), transparent);
+  pointer-events: none;
+}
+.toolbar-group {
+  gap: 8px;
+  padding: 0 2px;
+  flex: 0 0 auto;
+}
+.toolbar-label {
+  color: var(--art-muted);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.toolbar-divider {
+  width: 2px;
+  height: 52px;
+  margin: 0 2px;
+  background:
+    linear-gradient(180deg, transparent, rgba(214,176,106,0.82) 14%, rgba(52,35,17,0.9) 50%, rgba(214,176,106,0.72) 86%, transparent),
+    linear-gradient(90deg, transparent, rgba(255,234,177,0.18), transparent);
+  box-shadow:
+    -1px 0 rgba(0,0,0,0.65),
+    1px 0 rgba(255,228,169,0.09);
+}
+button,
+#toolbar button,
+#toolbar input[type="number"],
+#toolbar select,
+.object-filter {
+  border-radius: 6px;
+}
+#toolbar button,
+.top-command,
+.object-filter,
+.modal-actions button,
+#dropdown-menu button,
+#token-action-bar button,
+#annotation-action-bar button,
+#object-panel-live {
+  position: relative;
+  color: var(--art-ivory);
+  font-weight: 620;
+  background:
+    linear-gradient(180deg, rgba(255,239,199,0.08), transparent 31%),
+    linear-gradient(180deg, #24180f 0%, #15100b 52%, #090705 100%);
+  border: 1px solid rgba(157,117,57,0.68);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.62),
+    inset 0 1px rgba(255,238,190,0.16),
+    inset 0 -10px 16px rgba(0,0,0,0.24),
+    0 1px 0 rgba(255,234,177,0.10),
+    0 4px 10px rgba(0,0,0,0.30);
+  text-shadow: 0 1px 1px rgba(0,0,0,0.8);
+}
+#toolbar button {
+  min-height: 46px;
+  padding: 0 14px;
+  gap: 9px;
+  font-size: 15px;
+  line-height: 1;
+}
+#toolbar button:hover,
+.top-command:hover,
+.object-filter:hover,
+.modal-actions button:hover,
+#dropdown-menu button:hover,
+#token-action-bar button:hover,
+#annotation-action-bar button:hover,
+#object-panel-live:hover {
+  background:
+    linear-gradient(180deg, rgba(255,239,199,0.15), transparent 35%),
+    linear-gradient(180deg, #302114 0%, #1a120b 52%, #0a0705 100%);
+  border-color: rgba(214,176,106,0.90);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.58),
+    inset 0 1px rgba(255,238,190,0.25),
+    0 0 16px rgba(214,176,106,0.16);
+}
+#toolbar button.active,
+button.active,
+#app.surface-edit #btn-surface-toggle,
+.object-filter.active {
+  color: #fff5d6;
+  border-color: rgba(235,199,121,0.98);
+  background:
+    linear-gradient(180deg, rgba(255,242,201,0.20), transparent 35%),
+    linear-gradient(180deg, #3a2917 0%, #21160d 54%, #0c0805 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.62),
+    inset 0 0 16px rgba(214,176,106,0.16),
+    0 0 16px rgba(214,176,106,0.18);
+}
+#toolbar button:disabled {
+  color: rgba(159,139,102,0.62);
+  border-color: rgba(91,67,37,0.48);
+  opacity: 0.72;
+}
+.nav-ico {
+  color: var(--art-brass-hi);
+  font-size: 15px;
+  line-height: 1;
+}
+#brush-size-input {
+  width: 74px;
+  min-height: 46px;
+  color: var(--art-ivory);
+  background:
+    linear-gradient(180deg, rgba(255,239,199,0.05), transparent 35%),
+    linear-gradient(180deg, #1c130b, #0b0704);
+  border: 1px solid rgba(157,117,57,0.64);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.65);
+  font-weight: 700;
+}
+#canvas-container {
+  background:
+    radial-gradient(circle at 50% 45%, rgba(214,176,106,0.10), transparent 26%),
+    radial-gradient(circle at 50% 48%, rgba(255,242,197,0.035), transparent 19%),
+    repeating-linear-gradient(35deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 16px),
+    linear-gradient(180deg, #080706, #020202);
+  border-left: 1px solid rgba(157,117,57,0.58);
+  border-right: 1px solid rgba(157,117,57,0.58);
+}
+#canvas-container::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(157,117,57,0.72);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.75),
+    inset 0 0 70px rgba(0,0,0,0.54);
+  pointer-events: none;
+  z-index: 2;
+}
+#main { z-index: 1; }
+#splash {
+  color: var(--art-ivory);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.86);
+}
+#splash h1 {
+  color: var(--art-ivory);
+  font-weight: 520;
+}
+#splash h1::after {
+  content: '';
+  display: block;
+  width: 204px;
+  height: 13px;
+  margin: 8px auto 0;
+  background:
+    radial-gradient(circle at 50% 50%, var(--art-brass-hi) 0 3px, transparent 4px),
+    linear-gradient(90deg, transparent, var(--art-brass-hi), transparent);
+  opacity: 0.78;
+}
+#splash p { color: rgba(241,223,189,0.84); }
+#status-bar {
+  position: relative;
+  height: 76px;
+  padding: 10px 18px;
+  gap: 12px;
+  color: var(--art-muted);
+  background:
+    radial-gradient(circle at 3% 52%, rgba(214,176,106,0.10), transparent 8%),
+    radial-gradient(circle at 97% 52%, rgba(214,176,106,0.10), transparent 8%),
+    linear-gradient(180deg, rgba(255,235,180,0.10), transparent 14%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.024) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 3px, transparent 3px 28px),
+    linear-gradient(180deg, #2b1b10 0%, #1c120b 50%, #100a06 100%);
+  border-top: 1px solid rgba(214,176,106,0.82);
+  box-shadow:
+    inset 0 1px rgba(255,231,177,0.24),
+    inset 0 5px 0 rgba(0,0,0,0.28),
+    0 -10px 32px rgba(0,0,0,0.58);
+  overflow: hidden;
+}
+#status-bar::before {
+  content: '';
+  position: absolute;
+  inset: 6px 8px;
+  pointer-events: none;
+  border: 1px solid rgba(157,117,57,0.68);
+  background:
+    linear-gradient(90deg, rgba(214,176,106,0.12), transparent 12%, transparent 88%, rgba(214,176,106,0.12)),
+    linear-gradient(180deg, rgba(255,232,178,0.04), transparent 40%, rgba(0,0,0,0.15));
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.70);
+}
+#status-bar .seg,
+.status-crest,
+.status-separator {
+  position: relative;
+  z-index: 1;
+}
+.status-crest {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #d6ae62;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(245,213,143,0.18), transparent 44%),
+    linear-gradient(135deg, rgba(255,238,190,0.12), transparent 38%),
+    linear-gradient(180deg, #21150d, #120b06);
+  border: 1px solid rgba(168,123,54,0.82);
+  clip-path: polygon(24% 0, 76% 0, 100% 24%, 100% 76%, 76% 100%, 24% 100%, 0 76%, 0 24%);
+  box-shadow:
+    inset 0 0 0 2px rgba(0,0,0,0.58),
+    inset 0 0 0 3px rgba(214,176,106,0.16),
+    inset 0 1px rgba(255,232,178,0.13);
+}
+.status-crest span {
+  font-size: 25px;
+  text-shadow: 0 0 12px rgba(214,176,106,0.28);
+}
+.status-label {
+  color: rgba(207,187,148,0.72);
+  font-size: 14px;
+  font-weight: 500;
+}
+.status-chapter-block {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: min(460px, 38vw);
+}
+.status-plaque,
+.status-map-title,
+#status-mode,
+#status-saved {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(157,117,57,0.72);
+  background:
+    linear-gradient(180deg, rgba(255,239,199,0.08), transparent 38%),
+    linear-gradient(180deg, #1f150c, #0a0705);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.68),
+    inset 0 1px rgba(255,232,178,0.12);
+  color: var(--art-ivory);
+  text-shadow: 0 1px 1px rgba(0,0,0,0.8);
+}
+.status-plaque {
+  min-width: 250px;
+  width: min(320px, 30vw);
+  max-width: min(360px, 30vw);
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 760;
+  gap: 10px;
+  cursor: pointer;
+}
+.status-plaque:hover,
+.status-plaque:focus-visible {
+  border-color: rgba(232,196,124,0.95);
+  color: #fff0c5;
+}
+.status-chapter-number,
+.status-chapter-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-chapter-number {
+  flex: 0 0 auto;
+  color: #f1d9a4;
+}
+.status-chapter-title {
+  color: var(--art-ivory);
+  font-weight: 720;
+}
+#status-bar .status-map-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  width: min(560px, 36vw);
+  min-height: 42px;
+  padding: 0 26px;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 780;
+  letter-spacing: 0;
+}
+@media (max-width: 1400px) {
+  #status-bar .status-map-title {
+    width: min(420px, 30vw);
+  }
+}
+.status-map-label {
+  color: var(--art-muted);
+  font-weight: 600;
+}
+.status-map-value,
+.status-internal-scene {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-internal-scene {
+  display: none;
+  color: rgba(159,139,102,0.58);
+  max-width: 180px;
+  font-size: 11px;
+}
+.status-separator {
+  width: 1px;
+  height: 44px;
+  background: linear-gradient(180deg, transparent, rgba(214,176,106,0.45), transparent);
+}
+.status-ops {
+  display: inline-flex;
+  gap: 10px;
+  color: rgba(241,223,189,0.70);
+}
+.status-right-group {
+  position: relative;
+  z-index: 2;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+#status-mode {
+  min-width: 120px;
+  padding: 0 14px;
+  color: #e7c98b;
+  font-weight: 760;
+}
+#status-saved {
+  min-width: 120px;
+  padding: 0 32px 0 16px;
+  color: #f2d7a3;
+  font-size: 16px;
+  font-weight: 800;
+}
+#status-saved::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #b86135;
+  box-shadow: 0 0 10px rgba(184,97,53,0.7);
+}
+#status-saved[data-save-state="saved"]::after {
+  background: #83b86b;
+  box-shadow: 0 0 10px rgba(131,184,107,0.62);
+}
+#status-saved[data-save-state="saving"]::after {
+  background: #d6b06a;
+  box-shadow: 0 0 10px rgba(214,176,106,0.68);
+}
+#status-error {
+  color: #ffb4a8;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 1500px) {
+  .status-right-group .status-label,
+  .status-right-group #status-zoom,
+  .status-right-group .status-ops {
+    display: none;
+  }
+}
+#app.present-mode.placing-event #status-bar > :not(.status-right-group) {
+  display: none;
+}
+#app.present-mode.placing-event .status-right-group > :not(#status-place-event) {
+  display: none;
+}
+#app.present-mode.placing-event .status-right-group {
+  margin-left: 0;
+}
+#app.present-mode.placing-event #status-bar {
+  height: 28px;
+  padding: 0 12px;
+}
+#dropdown-menu,
+.modal-card,
+#event-card,
+#token-action-bar,
+#annotation-action-bar,
+#grid-calibration-panel,
+#object-panel,
+#loading-overlay .spinner {
+  border-color: rgba(157,117,57,0.72);
+  box-shadow:
+    inset 0 1px rgba(255,232,178,0.10),
+    var(--theme-shadow-spread) rgba(0,0,0,0.52);
+}
+#dropdown-menu,
+.modal-card,
+#event-card,
+#token-action-bar,
+#annotation-action-bar,
+#grid-calibration-panel,
+#object-panel {
+  background:
+    linear-gradient(180deg, rgba(255,239,199,0.05), transparent 28%),
+    color-mix(in srgb, var(--art-panel) 94%, transparent);
+}
+.modal-title,
+.object-panel-title,
+.event-card-title,
+#grid-calibration-panel .panel-title {
+  color: var(--art-ivory);
+}
+.modal-desc,
+.object-panel-meta,
+.object-section-title,
+.object-sub,
+#grid-calibration-panel .panel-meta {
+  color: var(--art-muted);
+}
+.object-panel-tools {
+  border-bottom-color: rgba(157,117,57,0.36);
+  background: rgba(0,0,0,0.12);
+}
+.object-panel-search {
+  background: linear-gradient(180deg, #1a120b, #0b0705);
+  border-color: rgba(157,117,57,0.58);
+  color: var(--art-ivory);
+}
+.object-filter-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.object-row {
+  border-color: rgba(157,117,57,0.18);
+  background: rgba(0,0,0,0.08);
+}
+.object-row:hover {
+  background: rgba(214,176,106,0.08);
+  border-color: rgba(157,117,57,0.54);
+}
+.object-row.selected {
+  border-color: rgba(235,199,121,0.95);
+  background: rgba(214,176,106,0.13);
+}
+.object-thumb {
+  background:
+    radial-gradient(circle at 50% 35%, rgba(214,176,106,0.16), transparent 42%),
+    linear-gradient(180deg, #21150d, #0c0805);
+  border: 1px solid rgba(157,117,57,0.46);
+  color: var(--art-brass-hi);
+}
+.object-name { color: var(--art-ivory); }
+.object-locate,
+.object-edit {
+  color: var(--art-brass-hi);
+  border: 1px solid rgba(157,117,57,0.28);
+  background: rgba(0,0,0,0.12);
+}
+.object-locate:hover,
+.object-edit:hover {
+  color: #fff2cf;
+  background: rgba(214,176,106,0.14);
+}
+.event-card-icon {
+  background: linear-gradient(180deg, #2a1b11, #0b0705);
+  border: 1px solid rgba(157,117,57,0.50);
+}
+.toast-message {
+  color: var(--art-ivory);
+  background:
+    linear-gradient(180deg, rgba(255,239,199,0.08), transparent 30%),
+    linear-gradient(180deg, #25190d, #0a0705);
+  border-color: rgba(214,176,106,0.78);
+}
+@media (max-width: 1024px) {
+  #toolbar {
+    min-height: 56px;
+    padding: 7px 8px;
+    gap: 7px;
+  }
+  #toolbar button {
+    min-height: 40px;
+    padding: 0 11px;
+    font-size: 13px;
+  }
+  .toolbar-divider { height: 40px; }
+  #status-bar {
+    height: 68px;
+    padding: 8px 10px;
+    gap: 9px;
+  }
+  .status-label,
+  .status-internal-scene,
+  #status-zoom,
+  .status-ops { display: none; }
+  .status-chapter-block {
+    max-width: 32vw;
+  }
+  .status-plaque {
+    min-width: 190px;
+    width: min(260px, 28vw);
+    max-width: 28vw;
+  }
+  #status-bar .status-map-title { width: min(360px, 32vw); }
+  #status-saved { min-width: 100px; }
+}
+@media (max-width: 1100px) {
+  #status-bar .status-map-title {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}
+@media (max-width: 860px) {
+  #toolbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(214,176,106,0.55) transparent;
+  }
+  #toolbar::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+  }
+  #toolbar::-webkit-scrollbar-thumb {
+    background: rgba(214,176,106,0.55);
+    border-radius: 999px;
+  }
+  #toolbar .label-only { display: none; }
+  #toolbar button {
+    min-width: 42px;
+    padding: 0 9px;
+  }
+  #status-bar {
+    height: 68px;
+    padding: 8px;
+    gap: 8px;
+  }
+  .status-crest {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+  .status-chapter-block {
+    max-width: 30vw;
+  }
+  .status-plaque {
+    min-width: 112px;
+    width: auto;
+    max-width: 30vw;
+    padding: 0 10px;
+    font-size: 13px;
+    gap: 6px;
+  }
+  #status-bar .status-map-title {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 0 10px;
+    font-size: 13px;
+    min-height: 34px;
+  }
+  #status-mode { display: none; }
+  .status-right-group {
+    margin-left: 0;
+    flex: 0 0 auto;
+  }
+  #status-saved {
+    min-width: 92px;
+    padding-left: 12px;
+    font-size: 13px;
+    flex: 0 0 auto;
+  }
+}
 @media (max-width: 720px) {
   #toolbar .label-only { display: none; }
+  #toolbar {
+    min-height: 52px;
+    padding: 6px;
+  }
+  #toolbar button {
+    min-width: 42px;
+    padding: 0 9px;
+  }
+  #brush-size-input { width: 58px; }
   #object-panel {
     top: auto;
     left: 8px;
     width: auto;
     height: min(48vh, 360px);
+  }
+  #status-bar {
+    height: 70px;
+    padding: 8px;
+    gap: 8px;
+  }
+  .status-crest {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+  .status-chapter-block {
+    max-width: 26vw;
+  }
+  .status-plaque {
+    min-width: 96px;
+    width: auto;
+    max-width: 26vw;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+  #status-bar .status-map-title {
+    min-width: 0;
+    flex: 1;
+    max-width: none;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+  #status-mode { display: none; }
+  #status-saved {
+    min-width: 92px;
+    padding-left: 12px;
+    font-size: 13px;
   }
 }
 </style>
@@ -890,39 +1586,39 @@ input[type="number"] {
 <body>
 <div id="app">
   <div id="toolbar">
-    <div class="toolbar-group">
-      <button id="btn-load-map" data-surface="edit" title="加载地图图片">📁 <span class="label-only">加载地图</span></button>
-      <button id="btn-load-token" data-surface="edit" title="添加 Token（玩家小队/NPC）">➕ <span class="label-only">Token</span></button>
-      <button id="btn-place-event" data-surface="edit" title="添加事件（Shift+点击地图也可）">🎯 <span class="label-only">事件</span></button>
-      <button id="btn-add-text" data-surface="edit" title="添加文字标注">文 <span class="label-only">文字</span></button>
-      <button id="btn-add-image" data-surface="edit" title="添加图片标注">🖼 <span class="label-only">图片</span></button>
+    <div class="toolbar-group toolbar-build-group">
+      <button id="btn-load-map" class="top-command" data-surface="edit" title="加载地图图片"><span class="nav-ico">▰</span><span class="label-only">加载地图</span></button>
+      <button id="btn-load-token" class="top-command" data-surface="edit" title="添加 Token（玩家小队/NPC）"><span class="nav-ico">♟</span><span class="label-only">Token</span></button>
+      <button id="btn-place-event" class="top-command" data-surface="edit" title="添加事件（Shift+点击地图也可）"><span class="nav-ico">◆</span><span class="label-only">事件</span></button>
+      <button id="btn-add-text" class="top-command annotation-command" data-surface="edit" title="添加文字标注"><span class="nav-ico">文</span><span class="label-only">文字</span></button>
+      <button id="btn-add-image" class="top-command annotation-command" data-surface="edit" title="添加图片标注"><span class="nav-ico">▧</span><span class="label-only">图片</span></button>
     </div>
     <div class="toolbar-divider" data-surface="edit"></div>
-    <div class="toolbar-group">
+    <div class="toolbar-group toolbar-layer-group">
       <span class="toolbar-label">层</span>
-      <button id="btn-layer-terrain" class="active" title="操作地形层">地形</button>
-      <button id="btn-layer-event" title="操作事件层">事件</button>
+      <button id="btn-layer-terrain" class="top-command active" title="操作地形层"><span class="nav-ico">▭</span><span class="label-only">地形</span></button>
+      <button id="btn-layer-event" class="top-command" title="操作事件层"><span class="nav-ico">◇</span><span class="label-only">事件</span></button>
     </div>
     <div class="toolbar-divider"></div>
-    <div class="toolbar-group">
+    <div class="toolbar-group toolbar-fog-group">
       <span class="toolbar-label">模式</span>
-      <button id="btn-mode-reveal" class="active" title="揭示模式 (E)">揭</button>
-      <button id="btn-mode-reveal-all" title="同时揭示地形层和事件层 (Q)">全揭</button>
-      <button id="btn-mode-cover" title="覆盖模式 (R)">盖</button>
+      <button id="btn-mode-reveal" class="top-command active" title="揭示模式 (E)"><span class="nav-ico">✹</span><span class="label-only">揭</span></button>
+      <button id="btn-mode-reveal-all" class="top-command" title="同时揭示地形层和事件层 (Q)"><span class="nav-ico">✦</span><span class="label-only">全揭</span></button>
+      <button id="btn-mode-cover" class="top-command" title="覆盖模式 (R)"><span class="nav-ico">■</span><span class="label-only">盖</span></button>
     </div>
     <div class="toolbar-divider"></div>
-    <div class="toolbar-group">
+    <div class="toolbar-group toolbar-brush-group">
       <span class="toolbar-label">笔刷</span>
-      <button id="btn-brush-dec" class="icon" title="缩小笔刷">−</button>
+      <button id="btn-brush-dec" class="icon top-command" title="缩小笔刷">−</button>
       <input id="brush-size-input" type="number" min="20" max="300" value="60">
-      <button id="btn-brush-inc" class="icon" title="放大笔刷">＋</button>
+      <button id="btn-brush-inc" class="icon top-command" title="放大笔刷">＋</button>
     </div>
     <div class="toolbar-divider"></div>
-    <button id="btn-undo" title="撤销 (Ctrl+Z)" disabled>↶ <span class="label-only">撤销</span></button>
+    <button id="btn-undo" class="top-command" title="撤销 (Ctrl+Z)" disabled><span class="nav-ico">↶</span><span class="label-only">撤销</span></button>
     <div class="toolbar-divider"></div>
-    <button id="btn-surface-toggle" title="切换跑团/编辑">编辑</button>
-    <button id="btn-present" title="演示模式 (F)">👁 <span class="label-only">演示</span></button>
-    <button id="btn-more" title="更多">⋯</button>
+    <button id="btn-surface-toggle" class="top-command surface-toggle" title="切换跑团/编辑"><span class="nav-ico">⚙</span><span class="label-only">编辑</span></button>
+    <button id="btn-present" class="top-command" title="演示模式 (F)"><span class="nav-ico">◉</span><span class="label-only">演示</span></button>
+    <button id="btn-more" class="top-command more-command" title="更多"><span class="nav-ico">⋯</span><span class="label-only">更多</span></button>
   </div>
   <div id="canvas-container">
     <canvas id="main"></canvas>
@@ -943,15 +1639,30 @@ input[type="number"] {
     <div id="present-handle" title="退出演示">⚙</div>
   </div>
   <div id="status-bar">
-    <span class="seg" id="status-scene" style="color: var(--theme-accent); font-weight: 500;"></span>
-    <span class="seg" id="status-zoom">100%</span>
-    <span class="seg" id="status-mode">地形·揭</span>
-    <span class="seg" id="status-tokens">0 Token</span>
-    <span class="seg" id="status-annotations">0 标注</span>
-    <span class="seg" id="status-events">0 事件</span>
-    <span class="seg" id="status-place-event" style="color: var(--theme-accent); font-weight: 600;"></span>
-    <span class="seg" id="status-saved"></span>
-    <span class="seg error" id="status-error"></span>
+    <span class="status-crest" aria-hidden="true"><span>✧</span></span>
+    <span class="status-chapter-block">
+      <span class="seg status-label">章节</span>
+      <button class="seg status-plaque" id="btn-edit-chapter" title="编辑章节信息">
+        <span class="status-chapter-number" id="status-chapter-number">第 1 章</span>
+        <span class="status-chapter-title" id="status-chapter-title"></span>
+      </button>
+    </span>
+    <span class="seg status-map-title"><span class="status-map-label">地图</span><span class="status-map-value" id="status-map-name">当前地图</span></span>
+    <span class="seg status-internal-scene" id="status-scene"></span>
+    <span class="status-right-group">
+      <span class="status-separator"></span>
+      <span class="seg status-label">状态</span>
+      <span class="seg" id="status-zoom">100%</span>
+      <span class="seg" id="status-mode">地形·揭</span>
+      <span class="seg status-ops" id="status-live-group">
+        <span id="status-tokens">0 Token</span>
+        <span id="status-annotations">0 标注</span>
+        <span id="status-events">0 事件</span>
+      </span>
+      <span class="seg" id="status-place-event" style="color: var(--theme-accent); font-weight: 600;"></span>
+      <span class="seg" id="status-saved" data-save-state="dirty">未保存</span>
+      <span class="seg error" id="status-error"></span>
+    </span>
   </div>
   <div id="dropdown-menu"></div>
 </div>
@@ -1279,9 +1990,28 @@ function showToast(msg, ms = 2200) {
 }
 
 function setStatusError(msg) { $('status-error').textContent = msg || ''; }
-function setStatusSaved(msg) { $('status-saved').textContent = msg || ''; }
+function setStatusSaved(msg) {
+  const el = $('status-saved');
+  el.textContent = msg || '未保存';
+  el.dataset.saveState = msg ? 'saved' : 'dirty';
+}
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+const DEFAULT_CHAPTER_NUMBER = '第 1 章';
+const DEFAULT_CHAPTER_TITLE = '';
+function normalizeChapterNumber(value) {
+  const text = String(value || '').trim().slice(0, 32);
+  return text || DEFAULT_CHAPTER_NUMBER;
+}
+function normalizeChapterTitle(value) {
+  return String(value || '').trim().slice(0, 48);
+}
+function sceneChapterNumber(scene) {
+  return normalizeChapterNumber(scene && scene.chapterNumber);
+}
+function sceneChapterTitle(scene) {
+  return normalizeChapterTitle(scene && scene.chapterTitle);
 }
 
 // ============== 坐标转换 ==============
@@ -1319,7 +2049,9 @@ function updateSurfaceChrome() {
   app.classList.toggle('surface-live', isLiveSurface());
   const btn = $('btn-surface-toggle');
   if (btn) {
-    btn.textContent = isEditSurface() ? '回到跑团' : '编辑';
+    const label = btn.querySelector('.label-only');
+    if (label) label.textContent = isEditSurface() ? '回到跑团' : '编辑';
+    else btn.textContent = isEditSurface() ? '回到跑团' : '编辑';
     btn.title = isEditSurface() ? '回到跑团态' : '进入编辑态';
   }
   const status = $('status-saved');
@@ -1902,6 +2634,8 @@ function migrateV2ToV3(v2Saved) {
     // v3 scene 元数据
     mapBlob: null,  // v2 没存图，迁移后用户需重新选地图（fog/tokens/events 会等待对接）
     name: '场景 1',
+    chapterNumber: DEFAULT_CHAPTER_NUMBER,
+    chapterTitle: DEFAULT_CHAPTER_TITLE,
     createdAt: v2Saved.ts || Date.now(),
     lastUsedAt: v2Saved.ts || Date.now(),
   };
@@ -1977,8 +2711,11 @@ async function serializeActiveSceneData() {
     layer: (ev.layer === 0 ? 0 : 1),
   }));
   const annotationsSerialized = state.annotations.map(serializeAnnotation);
+  const curScene = state.scenes[state.currentSceneId] || {};
   return {
     version: 2,  // scene 内部仍按 v2 saved 结构（向后兼容）
+    chapterNumber: sceneChapterNumber(curScene),
+    chapterTitle: sceneChapterTitle(curScene),
     fogLayers: {
       terrain: { blob: terrainBlob },
       event:   { blob: eventFogBlob },
@@ -2013,6 +2750,8 @@ async function syncActiveSceneToMemory() {
     ...sceneCore,
     mapBlob: prev.mapBlob || null,
     name: prev.name || '场景 1',
+    chapterNumber: sceneChapterNumber(prev),
+    chapterTitle: sceneChapterTitle(prev),
     createdAt: prev.createdAt || Date.now(),
     lastUsedAt: Date.now(),
   };
@@ -2136,6 +2875,8 @@ async function serializeSceneForBundle(sceneId, scene) {
   return {
     sceneId,
     name: scene.name || '场景',
+    chapterNumber: sceneChapterNumber(scene),
+    chapterTitle: sceneChapterTitle(scene),
     createdAt: scene.createdAt || null,
     lastUsedAt: scene.lastUsedAt || scene.ts || null,
     mapFingerprint: scene.mapFingerprint || null,
@@ -2167,7 +2908,7 @@ async function exportProject() {
     const payload = {
       format: 'fog-of-war-map.fogbundle',
       schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
-      appVersion: 'v3.7.1',
+      appVersion: 'v3.8.1',
       exportedAt: new Date().toISOString(),
       sceneCount: scenes.length,
       currentSceneId: state.currentSceneId,
@@ -2223,6 +2964,8 @@ async function bundleScenePayloadToSaved(scenePayload) {
   }));
   return {
     version: 2,
+    chapterNumber: sceneChapterNumber(scenePayload),
+    chapterTitle: sceneChapterTitle(scenePayload),
     fogLayers: {
       terrain: { blob: terrainBlob },
       event: { blob: eventFogBlob },
@@ -2316,6 +3059,8 @@ async function doImportSceneBundle(payload, selectedFiles) {
           mapFingerprint,
           mapSize: { w: preparedMap.w, h: preparedMap.h },
           name: scenePayload.name || `导入场景 ${preparedEntries.length + 1}`,
+          chapterNumber: sceneChapterNumber(scenePayload),
+          chapterTitle: sceneChapterTitle(scenePayload),
           createdAt: Date.now(),
           lastUsedAt: Date.now(),
           importedFromSceneId: scenePayload.sceneId || null,
@@ -2450,12 +3195,19 @@ async function doImportProject(payload) {
       annotations: annotationsRestored,
       view: null,
       settings: payload.settings || {},
+      chapterNumber: sceneChapterNumber(payload),
+      chapterTitle: sceneChapterTitle(payload),
       customTheme: payload.customTheme || null,
       mapFingerprint: state.mapFingerprint,  // 对齐当前指纹
       ts: Date.now(),
     };
     const restored = await restoreFromSaved(fakeSaved, { fitViewAfterRestore: true });
     if (!restored) return;
+    if (state.currentSceneId && state.scenes[state.currentSceneId]) {
+      state.scenes[state.currentSceneId].chapterNumber = sceneChapterNumber(payload);
+      state.scenes[state.currentSceneId].chapterTitle = sceneChapterTitle(payload);
+      updateSceneStatus();
+    }
     // 写 IDB（这样刷新后能继续）
     await triggerImmediateSave();
     hideLoading();
@@ -2481,6 +3233,8 @@ async function switchScene(targetId) {
         mapBlob: prev.mapBlob || null,
         mapSize: sceneCore.mapSize,
         name: prev.name || '场景',
+        chapterNumber: sceneChapterNumber(prev),
+        chapterTitle: sceneChapterTitle(prev),
         createdAt: prev.createdAt || Date.now(),
         lastUsedAt: Date.now(),
       };
@@ -3820,17 +4574,73 @@ function updateEventsStatus() {
   $('status-events').textContent = state.events.length + ' 事件';
   updateObjectPanel();
 }
+function openChapterModal() {
+  if (!state.currentSceneId || !state.scenes[state.currentSceneId]) {
+    showToast('请先加载地图');
+    return;
+  }
+  const sceneId = state.currentSceneId;
+  const scene = state.scenes[sceneId];
+  showModal(`
+    <div class="modal-title">编辑章节</div>
+    <div class="modal-desc">章节序号和章节标题会跟随当前场景保存，并随“导出全部场景”一起导出。</div>
+    <div class="form-row">
+      <label for="chapter-number-input">章节序号</label>
+      <input id="chapter-number-input" type="text" maxlength="32" value="${escapeHtml(sceneChapterNumber(scene))}" placeholder="第 1 章">
+    </div>
+    <div class="form-row">
+      <label for="chapter-title-input">章节标题</label>
+      <input id="chapter-title-input" type="text" maxlength="48" value="${escapeHtml(sceneChapterTitle(scene))}" placeholder="例如：烛堡之门">
+    </div>
+    <div class="modal-actions">
+      <button id="chapter-cancel">取消</button>
+      <button id="chapter-save" class="primary">保存</button>
+    </div>
+  `, {
+    onMounted: () => {
+      const numberInput = $('chapter-number-input');
+      const titleInput = $('chapter-title-input');
+      numberInput.focus();
+      numberInput.select();
+      $('chapter-cancel').addEventListener('click', closeModal);
+      $('chapter-save').addEventListener('click', () => {
+        const target = state.scenes[sceneId];
+        if (!target) { closeModal(); return; }
+        target.chapterNumber = normalizeChapterNumber(numberInput.value);
+        target.chapterTitle = normalizeChapterTitle(titleInput.value);
+        updateSceneStatus();
+        triggerImmediateSave();
+        closeModal();
+        showToast('章节已更新');
+      });
+      [numberInput, titleInput].forEach((input) => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.isComposing) $('chapter-save').click();
+        });
+      });
+    }
+  });
+}
 function updateSceneStatus() {
   const el = $('status-scene');
+  const mapEl = $('status-map-name');
+  const chapterNumberEl = $('status-chapter-number');
+  const chapterTitleEl = $('status-chapter-title');
   if (!el) return;
   const sceneCount = Object.keys(state.scenes).length;
   if (!state.currentSceneId || !state.scenes[state.currentSceneId]) {
     el.textContent = '';
+    if (mapEl) mapEl.textContent = '当前地图';
+    if (chapterNumberEl) chapterNumberEl.textContent = DEFAULT_CHAPTER_NUMBER;
+    if (chapterTitleEl) chapterTitleEl.textContent = DEFAULT_CHAPTER_TITLE;
     return;
   }
   const cur = state.scenes[state.currentSceneId];
   const name = cur.name || '场景';
   el.textContent = sceneCount > 1 ? `📚 ${name} (${sceneCount})` : `📚 ${name}`;
+  if (mapEl) mapEl.textContent = name || '当前地图';
+  if (chapterNumberEl) chapterNumberEl.textContent = sceneChapterNumber(cur);
+  if (chapterTitleEl) chapterTitleEl.textContent = sceneChapterTitle(cur);
 }
 
 function findTopTokenAt(mx, my) {
@@ -5194,6 +6004,8 @@ function createSceneWithPreparedMap(file, preparedMap, nextFingerprint, w, h) {
   state.scenes[newId] = {
     version: 2,
     name: `场景 ${Object.keys(state.scenes).length + 1}`,
+    chapterNumber: DEFAULT_CHAPTER_NUMBER,
+    chapterTitle: DEFAULT_CHAPTER_TITLE,
     mapBlob: file,
     mapFingerprint: nextFingerprint,
     mapSize: { w, h },
@@ -5276,6 +6088,8 @@ async function loadMapFile(file) {
           mapBlob: prev.mapBlob || null,
           mapSize: sceneCore.mapSize,
           name: prev.name || '场景',
+          chapterNumber: sceneChapterNumber(prev),
+          chapterTitle: sceneChapterTitle(prev),
           createdAt: prev.createdAt || Date.now(),
           lastUsedAt: Date.now(),
         };
@@ -6451,6 +7265,7 @@ function setupEventListeners() {
   $('btn-surface-toggle').addEventListener('click', () => setSurfaceMode(isEditSurface() ? 'live' : 'edit'));
   $('btn-present').addEventListener('click', () => togglePresentMode());
   $('present-handle').addEventListener('click', () => togglePresentMode(false));
+  $('btn-edit-chapter').addEventListener('click', openChapterModal);
 
   $('top-hover-zone').addEventListener('pointerenter', peekToolbar);
   $('top-hover-zone').addEventListener('pointermove', (e) => {
