@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -253,7 +253,7 @@ button.icon { padding: 6px 10px; }
   flex-direction: column;
   overflow: hidden;
 }
-#app.surface-edit:not(.present-mode) #object-panel { display: flex; }
+#app.surface-edit #object-panel { display: flex; }
 .object-panel-header {
   padding: 10px 12px;
   border-bottom: 1px solid var(--theme-bg-input);
@@ -337,6 +337,10 @@ button.icon { padding: 6px 10px; }
   border-color: var(--theme-accent);
   background: color-mix(in srgb, var(--theme-accent) 22%, transparent);
 }
+.object-row.tag-active {
+  border-color: var(--theme-warn);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-warn) 55%, transparent);
+}
 .object-thumb {
   width: 32px;
   height: 32px;
@@ -371,6 +375,28 @@ button.icon { padding: 6px 10px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.object-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.object-tag-chip,
+.info-tag-chip {
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 42%, transparent);
+  border-radius: var(--theme-radius-sm);
+  background: color-mix(in srgb, var(--theme-bg-input) 76%, transparent);
+  color: var(--theme-text);
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 2px 6px;
+}
+.object-tag-chip.active,
+.info-tag-chip.active {
+  border-color: var(--theme-warn);
+  background: color-mix(in srgb, var(--theme-warn) 24%, var(--theme-bg-input));
+  color: var(--theme-text);
+}
 .object-locate,
 .object-edit {
   width: 32px;
@@ -393,6 +419,90 @@ button.icon { padding: 6px 10px; }
   font-size: 13px;
   padding: 18px 8px;
   text-align: center;
+}
+.info-tag-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(56vh, 520px);
+  overflow: auto;
+  padding-right: 2px;
+}
+.info-tag-row {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-input);
+  color: var(--theme-text);
+  border-radius: var(--theme-radius-sm);
+}
+.info-tag-row.active {
+  border-color: var(--theme-warn);
+  background: color-mix(in srgb, var(--theme-warn) 20%, var(--theme-bg-input));
+}
+.info-tag-name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.info-tag-count {
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.entry-picker-list,
+.entry-manager-list {
+  display: grid;
+  gap: 8px;
+}
+.entry-picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.entry-pick {
+  min-height: 30px;
+  padding: 4px 9px;
+  border-radius: var(--theme-radius-sm);
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-input);
+  color: var(--theme-text);
+}
+.entry-pick.selected {
+  border-color: var(--entry-color, var(--theme-warn));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--entry-color, var(--theme-warn)) 60%, transparent);
+}
+.entry-new-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.entry-manager-row {
+  display: grid;
+  grid-template-columns: 34px 1.2fr 90px 92px 72px;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-input);
+  border-radius: var(--theme-radius-sm);
+  padding: 8px;
+}
+.entry-color-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.55);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.28);
+}
+#btn-entry-spotlight.active {
+  border-color: var(--entry-color, var(--theme-warn));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--entry-color, var(--theme-warn)) 65%, transparent), 0 0 14px color-mix(in srgb, var(--entry-color, var(--theme-warn)) 32%, transparent);
 }
 
 /* ============== 事件小卡片 ============== */
@@ -440,28 +550,6 @@ button.icon { padding: 6px 10px; }
 }
 .event-card-actions button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
 
-/* ============== Present handle ============== */
-#present-handle {
-  position: absolute;
-  right: 12px;
-  bottom: 36px;
-  width: 36px;
-  height: 36px;
-  background: color-mix(in srgb, var(--theme-bg-panel) 50%, transparent);
-  border: 1px solid color-mix(in srgb, var(--theme-border) 50%, transparent);
-  border-radius: 50%;
-  cursor: pointer;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  opacity: 0.4;
-  transition: opacity 200ms;
-  font-size: 18px;
-  user-select: none;
-}
-#present-handle:hover { opacity: 1; }
-
 #top-hover-zone {
   position: absolute;
   top: 0; left: 0;
@@ -471,41 +559,7 @@ button.icon { padding: 6px 10px; }
   display: none;
 }
 
-/* ============== 演示模式 ============== */
-#app.present-mode #toolbar {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-110%);
-}
-#app.present-mode #toolbar.peeked {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-#app.present-mode #status-bar {
-  opacity: 0;
-  pointer-events: none;
-  height: 0;
-  padding: 0;
-  border: none;
-}
-#app.present-mode #brush-rail { opacity: 0.25; }
-#app.present-mode #present-handle { display: flex; }
-#app.present-mode #top-hover-zone { display: block; }
-#app.present-mode .event-card-actions { display: none; }
 #app.surface-live .event-card-actions { display: none; }
-
-/* 演示模式下，若 placeEventMode 开着，status-bar 仅显示放置事件提示（其它段隐藏） */
-#app.present-mode.placing-event #status-bar {
-  opacity: 1;
-  height: 24px;
-  padding: 0 12px;
-  border-top: 1px solid var(--theme-bg-input);
-}
-#app.present-mode.placing-event #status-bar > :not(.status-right-group) { display: none; }
-#app.present-mode.placing-event .status-right-group > :not(#status-place-event) { display: none; }
-#app.present-mode.placing-event .status-right-group { margin-left: 0; }
-#app.present-mode.placing-event #status-place-event { display: inline; }
 
 /* ============== Dropdown menu ============== */
 #dropdown-menu {
@@ -1413,19 +1467,6 @@ button.active,
     display: none;
   }
 }
-#app.present-mode.placing-event #status-bar > :not(.status-right-group) {
-  display: none;
-}
-#app.present-mode.placing-event .status-right-group > :not(#status-place-event) {
-  display: none;
-}
-#app.present-mode.placing-event .status-right-group {
-  margin-left: 0;
-}
-#app.present-mode.placing-event #status-bar {
-  height: 28px;
-  padding: 0 12px;
-}
 #dropdown-menu,
 .modal-card,
 #event-card,
@@ -1710,7 +1751,7 @@ button.active,
     <button id="btn-undo" class="top-command" title="撤销 (Ctrl+Z)" disabled><span class="nav-ico">↶</span><span class="label-only">撤销</span></button>
     <div class="toolbar-divider"></div>
     <button id="btn-surface-toggle" class="top-command surface-toggle" title="切换跑团/编辑"><span class="nav-ico">⚙</span><span class="label-only">编辑</span></button>
-    <button id="btn-present" class="top-command" title="演示模式 (F)"><span class="nav-ico">◉</span><span class="label-only">演示</span></button>
+    <button id="btn-entry-spotlight" class="top-command" title="词条聚光"><span class="nav-ico">◇</span><span class="label-only">词条</span></button>
     <button id="btn-more" class="top-command more-command" title="更多"><span class="nav-ico">⋯</span><span class="label-only">更多</span></button>
   </div>
   <div id="canvas-container">
@@ -1729,7 +1770,6 @@ button.active,
     <aside id="object-panel" aria-label="对象列表"></aside>
     <div id="event-card"></div>
     <div id="top-hover-zone"></div>
-    <div id="present-handle" title="退出演示">⚙</div>
   </div>
   <div id="status-bar">
     <span class="status-crest" aria-hidden="true"><span>✧</span></span>
@@ -1894,6 +1934,8 @@ const state = {
   selectedEventId: null,
   placeEventMode: false,
   eventCardOpenId: null,
+  entries: [],
+  activeEntryId: null, // 运行态，不持久化、不导出；只控制当前现场聚光
   // 撤销栈（合并：fog + event 操作）
   undoStack: [],
   checkpoints: [],
@@ -1902,7 +1944,6 @@ const state = {
   // UI 模式
   uiMode: 'normal',
   surfaceMode: 'live',
-  presentMode: false,
   objectPanelFilter: 'all',
   objectPanelQuery: '',
   toolbarPeekTimer: null,
@@ -2152,8 +2193,7 @@ function isLiveSurface() { return state.surfaceMode !== 'edit'; }
 function setSurfaceMode(mode) {
   const next = mode === 'edit' ? 'edit' : 'live';
   if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
-  if (state.uiMode === 'modal' || state.uiMode === 'present+modal') { showToast('请先关闭当前弹窗'); return; }
-  if (next === 'edit' && state.presentMode) togglePresentMode(false);
+  if (state.uiMode === 'modal') { showToast('请先关闭当前弹窗'); return; }
   state.surfaceMode = next;
   if (next === 'live') {
     if (state.placeEventMode) togglePlaceEventMode(false);
@@ -2183,8 +2223,8 @@ function updateSurfaceChrome() {
 }
 
 function canUseEditTools() {
-  return isEditSurface() && !state.presentMode && !state.gridCalibration &&
-    state.uiMode !== 'modal' && state.uiMode !== 'present+modal' && state.uiMode !== 'grid-calibration';
+  return isEditSurface() && !state.gridCalibration &&
+    state.uiMode !== 'modal' && state.uiMode !== 'grid-calibration';
 }
 
 function requireEditSurface() {
@@ -2241,7 +2281,233 @@ function hideObjectPanel() {
   if (panel) panel.innerHTML = '';
 }
 
+const ENTRY_COLORS = ['#fbbf24', '#60a5fa', '#34d399', '#f87171', '#c084fc', '#f472b6', '#a3e635', '#fb923c'];
+
+function normalizeEntryName(name) {
+  return String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+
+function entryNameKey(name) {
+  return normalizeEntryName(name).toLowerCase();
+}
+
+function normalizeEntryIdsForEntries(value, entries) {
+  const source = Array.isArray(value) ? value : (value ? [value] : []);
+  const known = new Set((entries || []).map((e) => e.id));
+  const out = [];
+  const seen = new Set();
+  for (const id of source) {
+    const clean = String(id || '').trim();
+    if (!clean || seen.has(clean) || (known.size && !known.has(clean))) continue;
+    seen.add(clean);
+    out.push(clean);
+  }
+  return out;
+}
+
+function normalizeEntryIds(value) {
+  return normalizeEntryIdsForEntries(value, state.entries || []);
+}
+
+function cleanEntryIds(value) {
+  const source = Array.isArray(value) ? value : (value ? [value] : []);
+  const out = [];
+  const seen = new Set();
+  for (const id of source) {
+    const clean = String(id || '').trim();
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+  }
+  return out;
+}
+
+function normalizeEntries(entries) {
+  const out = [];
+  const seenNames = new Set();
+  const seenIds = new Set();
+  for (const raw of (Array.isArray(entries) ? entries : [])) {
+    const name = normalizeEntryName(raw?.name);
+    const key = entryNameKey(name);
+    if (!name || seenNames.has(key)) continue;
+    let id = String(raw?.id || '').trim();
+    if (!id || seenIds.has(id)) id = uuid();
+    seenNames.add(key);
+    seenIds.add(id);
+    out.push({
+      id,
+      name,
+      color: normalizeHex(raw?.color || ENTRY_COLORS[out.length % ENTRY_COLORS.length]),
+      livePicker: raw?.livePicker !== false,
+      sortOrder: Number.isFinite(raw?.sortOrder) ? raw.sortOrder : out.length,
+      createdAt: raw?.createdAt || Date.now(),
+      updatedAt: raw?.updatedAt || Date.now(),
+    });
+  }
+  out.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.name.localeCompare(b.name, 'zh-Hans-CN'));
+  return out;
+}
+
+function getEntryById(id) {
+  return (state.entries || []).find((e) => e.id === id) || null;
+}
+
+function objectEntryIds(item) {
+  return normalizeEntryIds(item?.entryIds || []);
+}
+
+function objectHasEntry(item, entryId) {
+  if (!entryId) return false;
+  return objectEntryIds(item).includes(entryId);
+}
+
+function objectHasActiveEntry(item) {
+  return objectHasEntry(item, state.activeEntryId);
+}
+
+function objectEntryNames(item) {
+  return objectEntryIds(item)
+    .map((id) => getEntryById(id))
+    .filter(Boolean)
+    .map((entry) => entry.name);
+}
+
+function collectEntryCounts() {
+  const counts = new Map((state.entries || []).map((entry) => [entry.id, { event: 0, token: 0, annotation: 0, total: 0 }]));
+  const add = (kind, item) => {
+    for (const id of objectEntryIds(item)) {
+      if (!counts.has(id)) counts.set(id, { event: 0, token: 0, annotation: 0, total: 0 });
+      const row = counts.get(id);
+      row[kind] += 1;
+      row.total += 1;
+    }
+  };
+  state.events.forEach((item) => add('event', item));
+  state.tokens.forEach((item) => add('token', item));
+  state.annotations.forEach((item) => add('annotation', item));
+  return counts;
+}
+
+function createEntry(name, opts = {}) {
+  const cleanName = normalizeEntryName(name);
+  if (!cleanName) { showToast('词条名不能为空'); return null; }
+  const key = entryNameKey(cleanName);
+  const existing = (state.entries || []).find((entry) => entryNameKey(entry.name) === key);
+  if (existing) return existing;
+  const entry = {
+    id: uuid(),
+    name: cleanName,
+    color: normalizeHex(opts.color || ENTRY_COLORS[(state.entries || []).length % ENTRY_COLORS.length]),
+    livePicker: opts.livePicker !== false,
+    sortOrder: state.entries.length,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  state.entries.push(entry);
+  state.entries = normalizeEntries(state.entries);
+  updateEntryButton();
+  updateObjectPanel();
+  triggerDebouncedSave();
+  return entry;
+}
+
+function pruneEntryReferences() {
+  state.entries = normalizeEntries(state.entries);
+  const liveIds = new Set(state.entries.map((entry) => entry.id));
+  const prune = (item) => { item.entryIds = (item.entryIds || []).filter((id) => liveIds.has(id)); };
+  state.events.forEach(prune);
+  state.tokens.forEach(prune);
+  state.annotations.forEach(prune);
+  if (state.activeEntryId && !liveIds.has(state.activeEntryId)) state.activeEntryId = null;
+}
+
+function setActiveEntry(entryId) {
+  const next = getEntryById(entryId) ? entryId : null;
+  state.activeEntryId = next;
+  updateEntryButton();
+  scheduleRender('all');
+}
+
+function updateEntryButton() {
+  const btn = $('btn-entry-spotlight');
+  if (!btn) return;
+  const entry = getEntryById(state.activeEntryId);
+  btn.classList.toggle('active', !!entry);
+  btn.style.setProperty('--entry-color', entry ? entry.color : '');
+  const label = btn.querySelector('.label-only');
+  if (label) label.textContent = entry ? `词条: ${entry.name}` : '词条';
+}
+
+function entryChipsHTML(entryIds) {
+  const ids = new Set(normalizeEntryIds(entryIds));
+  return objectEntryIds({ entryIds: Array.from(ids) }).map((id) => {
+    const entry = getEntryById(id);
+    if (!entry) return '';
+    const active = state.activeEntryId === id ? ' active' : '';
+    return `<span class="object-tag-chip${active}" style="border-color:${escapeHtml(entry.color)}">${escapeHtml(entry.name)}</span>`;
+  }).join('');
+}
+
+function entryAssignmentHTML(selectedIds) {
+  const ids = new Set(normalizeEntryIds(selectedIds));
+  const chips = (state.entries || []).map((entry) => `
+    <button type="button" class="entry-pick${ids.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}">${escapeHtml(entry.name)}</button>
+  `).join('');
+  return `
+    <div class="form-row">
+      <label>词条</label>
+      <div class="entry-picker-list">
+        <div class="entry-picker-chips" id="entry-picker-chips">${chips || '<span class="object-empty" style="padding:4px 0;text-align:left;">暂无词条</span>'}</div>
+        <div class="entry-new-row">
+          <input id="entry-new-name" type="text" maxlength="40" placeholder="新建词条">
+          <button id="entry-new-add" type="button">新建</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function mountEntryAssignmentControl(initialIds) {
+  const selected = new Set(normalizeEntryIds(initialIds));
+  const render = () => {
+    const box = $('entry-picker-chips');
+    if (!box) return;
+    box.innerHTML = (state.entries || []).map((entry) => `
+      <button type="button" class="entry-pick${selected.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}">${escapeHtml(entry.name)}</button>
+    `).join('') || '<span class="object-empty" style="padding:4px 0;text-align:left;">暂无词条</span>';
+    box.querySelectorAll('.entry-pick').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.entryId;
+        if (selected.has(id)) selected.delete(id);
+        else selected.add(id);
+        render();
+      });
+    });
+  };
+  render();
+  const addBtn = $('entry-new-add');
+  const input = $('entry-new-name');
+  if (addBtn && input) {
+    const add = () => {
+      const entry = createEntry(input.value);
+      if (!entry) return;
+      selected.add(entry.id);
+      input.value = '';
+      render();
+    };
+    addBtn.addEventListener('click', add);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); add(); }
+    });
+  }
+  return () => normalizeEntryIds(Array.from(selected));
+}
+
 function objectMaskLabel(kind, item) {
+  if (objectHasActiveEntry(item)) {
+    const entry = getEntryById(state.activeEntryId);
+    return `词条聚光：${entry ? entry.name : '已激活'}`;
+  }
   if (kind === 'event') return item.layer === 0 ? '公开事件' : '受事件雾';
   if (kind === 'annotation') {
     const mode = normalizeAnnotationMaskMode(item.maskMode);
@@ -2290,6 +2556,7 @@ function objectMatchesPanelQuery(kind, item, q) {
     objectTitle(kind, item),
     objectMaskLabel(kind, item),
     objectSizeSummary(kind, item),
+    objectEntryNames(item).join(' '),
     kind === 'event' ? item.content : '',
     kind === 'annotation' && item.type === 'text' ? item.text : '',
   ].join(' ').toLowerCase();
@@ -2347,7 +2614,7 @@ function renderObjectPanelList() {
     for (const row of rows) {
       const isSelected = selected && selected.kind === row.kind && selected.item.id === row.item.id;
       const btn = document.createElement('button');
-      btn.className = 'object-row' + (isSelected ? ' selected' : '');
+      btn.className = 'object-row' + (isSelected ? ' selected' : '') + (objectHasActiveEntry(row.item) ? ' tag-active' : '');
       btn.dataset.kind = row.kind;
       btn.dataset.id = row.item.id;
       btn.innerHTML = `
@@ -2355,6 +2622,7 @@ function renderObjectPanelList() {
         <span class="object-main">
           <span class="object-name">${escapeHtml(objectTitle(row.kind, row.item))}</span>
           <span class="object-sub">${escapeHtml(objectMaskLabel(row.kind, row.item))} · ${escapeHtml(objectSizeSummary(row.kind, row.item))}</span>
+          ${objectEntryIds(row.item).length ? `<span class="object-tags">${entryChipsHTML(row.item.entryIds)}</span>` : ''}
         </span>
         <span class="object-locate" title="定位">⌖</span>
         <span class="object-edit" title="编辑">✎</span>
@@ -2887,6 +3155,7 @@ async function serializeActiveSceneData() {
     id: t.id, blob: t.blob, shape: t.shape, borderColor: t.borderColor,
     borderPattern: t.borderPattern, name: t.name,
     x: t.x, y: t.y, size: t.size, zOrder: t.zOrder,
+    entryIds: objectEntryIds(t),
   }));
   const eventsSerialized = state.events.map((ev) => ({
     id: ev.id, x: ev.x, y: ev.y,
@@ -2896,6 +3165,7 @@ async function serializeActiveSceneData() {
          : { type: 'emoji', value: ev.icon.value }),
     title: ev.title, content: ev.content, size: ev.size, zOrder: ev.zOrder,
     layer: (ev.layer === 0 ? 0 : 1),
+    entryIds: objectEntryIds(ev),
   }));
   const annotationsSerialized = state.annotations.map(serializeAnnotation);
   const curScene = state.scenes[state.currentSceneId] || {};
@@ -2911,6 +3181,7 @@ async function serializeActiveSceneData() {
     tokens: tokensSerialized,
     events: eventsSerialized,
     annotations: annotationsSerialized,
+    entries: normalizeEntries(state.entries),
     view: { ...state.view },
     settings: {
       brushSize: state.brush.sizeScreen,
@@ -3035,11 +3306,13 @@ async function serializeSceneForBundle(sceneId, scene, opts = {}) {
     blobToBase64(scene.fogLayers.terrain.blob),
     blobToBase64(scene.fogLayers.event.blob),
   ]);
+  const sceneEntries = normalizeEntries(scene.entries || []);
   const tokensExported = await Promise.all((scene.tokens || []).map(async (t) => ({
     id: t.id,
     blob: await blobToBase64(t.blob),
     shape: t.shape, borderColor: t.borderColor, borderPattern: t.borderPattern,
     name: t.name, x: t.x, y: t.y, size: t.size, zOrder: t.zOrder,
+    entryIds: normalizeEntryIdsForEntries(t.entryIds || [], sceneEntries),
   })));
   const eventsExported = await Promise.all((scene.events || []).map(async (ev) => {
     const icon = ev.icon || { type: 'emoji', value: '❓' };
@@ -3052,10 +3325,12 @@ async function serializeSceneForBundle(sceneId, scene, opts = {}) {
       id: ev.id, x: ev.x, y: ev.y, icon: iconSer,
       title: ev.title, content: ev.content, size: ev.size, zOrder: ev.zOrder,
       layer: (ev.layer === 0 ? 0 : 1),
+      entryIds: normalizeEntryIdsForEntries(ev.entryIds || [], sceneEntries),
     };
   }));
   const annotationsExported = await Promise.all((scene.annotations || []).map(async (ann) => {
     const ser = serializeAnnotation(ann);
+    ser.entryIds = normalizeEntryIdsForEntries(ann.entryIds || [], sceneEntries);
     if (ser.type === 'image') ser.blob = await blobToBase64(ann.blob);
     return ser;
   }));
@@ -3074,6 +3349,7 @@ async function serializeSceneForBundle(sceneId, scene, opts = {}) {
     tokens: tokensExported,
     events: eventsExported,
     annotations: annotationsExported,
+    entries: sceneEntries,
     view: scene.view || null,
     settings: scene.settings || {},
   };
@@ -3140,19 +3416,22 @@ async function bundleScenePayloadToSaved(scenePayload) {
   const terrainBlob = await base64ToBlob(scenePayload.fogLayers.terrain.base64);
   const eventFogBlob = await base64ToBlob(scenePayload.fogLayers.event.base64);
   if (!terrainBlob || !eventFogBlob) throw new Error(`场景"${scenePayload.name || '未命名'}" fog 数据解码失败`);
+  const entries = normalizeEntries(scenePayload.entries || []);
   const tokens = await Promise.all((scenePayload.tokens || []).map(async (t) => ({
     ...t,
     blob: await base64ToBlob(t.blob),
+    entryIds: normalizeEntryIdsForEntries(t.entryIds || [], entries),
   })));
   const events = await Promise.all((scenePayload.events || []).map(async (ev) => {
     const icon = ev.icon || { type: 'emoji', value: '❓' };
     let restoredIcon = icon;
     if (icon.type === 'image') restoredIcon = { type: 'image', blob: await base64ToBlob(icon.blob) };
-    return { ...ev, icon: restoredIcon };
+    return { ...ev, icon: restoredIcon, entryIds: normalizeEntryIdsForEntries(ev.entryIds || [], entries) };
   }));
   const annotations = await Promise.all((scenePayload.annotations || []).map(async (ann) => {
-    if (ann.type === 'image') return { ...ann, blob: await base64ToBlob(ann.blob) };
-    return ann;
+    const base = { ...ann, entryIds: normalizeEntryIdsForEntries(ann.entryIds || [], entries) };
+    if (ann.type === 'image') return { ...base, blob: await base64ToBlob(ann.blob) };
+    return base;
   }));
   return {
     version: 2,
@@ -3166,6 +3445,7 @@ async function bundleScenePayloadToSaved(scenePayload) {
     tokens,
     events,
     annotations,
+    entries,
     view: scenePayload.view || null,
     settings: scenePayload.settings || {},
     mapFingerprint: scenePayload.mapFingerprint || null,
@@ -3358,9 +3638,11 @@ async function doImportProject(payload) {
     const terrainBlob = await base64ToBlob(payload.fogLayers.terrain.base64);
     const eventFogBlob = await base64ToBlob(payload.fogLayers.event.base64);
     if (!terrainBlob || !eventFogBlob) throw new Error('fog 数据解码失败');
+    const entries = normalizeEntries(payload.entries || []);
     const tokensRestored = await Promise.all((payload.tokens || []).map(async (t) => ({
       ...t,
       blob: await base64ToBlob(t.blob),
+      entryIds: normalizeEntryIdsForEntries(t.entryIds || [], entries),
     })));
     const eventsRestored = await Promise.all((payload.events || []).map(async (ev) => {
       const icon = ev.icon || { type: 'emoji', value: '❓' };
@@ -3371,11 +3653,12 @@ async function doImportProject(payload) {
       } else {
         restoredIcon = icon;
       }
-      return { ...ev, icon: restoredIcon };
+      return { ...ev, icon: restoredIcon, entryIds: normalizeEntryIdsForEntries(ev.entryIds || [], entries) };
     }));
     const annotationsRestored = await Promise.all((payload.annotations || []).map(async (ann) => {
-      if (ann.type === 'image') return { ...ann, blob: await base64ToBlob(ann.blob) };
-      return ann;
+      const base = { ...ann, entryIds: normalizeEntryIdsForEntries(ann.entryIds || [], entries) };
+      if (ann.type === 'image') return { ...base, blob: await base64ToBlob(ann.blob) };
+      return base;
     }));
     // 构造 saved 对象，重用 restoreFromSaved
     const fakeSaved = {
@@ -3387,6 +3670,7 @@ async function doImportProject(payload) {
       tokens: tokensRestored,
       events: eventsRestored,
       annotations: annotationsRestored,
+      entries,
       view: null,
       settings: payload.settings || {},
       chapterNumber: sceneChapterNumber(payload),
@@ -3483,6 +3767,8 @@ async function deleteScene(id) {
       state.hasMap = false;
       clearAnnotationRuntimeResources();
       state.tokens = []; state.events = []; state.annotations = [];
+      state.entries = [];
+      state.activeEntryId = null;
       clearSelection({ render: false });
       state.undoStack = [];
       // 释放 mapImage
@@ -3490,7 +3776,7 @@ async function deleteScene(id) {
         try { state.mapImage.close(); } catch (_) {}
       }
       state.mapImage = null;
-      updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton(); updateSceneStatus();
+      updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateEntryButton(); updateUndoButton(); updateSceneStatus();
       refreshSelectionUi();
       $('splash').style.display = 'flex';
       scheduleRender('all');
@@ -3839,7 +4125,7 @@ function finishGridCalibration(save) {
     state.grid = cloneGridSettings(calibration.originalGrid);
   }
   state.gridCalibration = null;
-  state.uiMode = state.presentMode ? 'present' : 'normal';
+  state.uiMode = 'normal';
   cancelLongPress();
   for (const [id] of state.pointers) {
     try { state.mainCanvas.releasePointerCapture(id); } catch (_) {}
@@ -3957,6 +4243,7 @@ function drawAll() {
   drawAllAnnotations(ctx, 'public');
   setScreenTransform();
   drawAllEvents(ctx, 0);
+  drawEntrySpotlightEvents(ctx);
 
   // 6. 网格线 overlay（v3.1，地图坐标系，token 之下）
   setMapTransform();
@@ -4044,6 +4331,7 @@ function drawSingleToken(ctx, t) {
     }
     ctx.restore();
   }
+  if (objectHasActiveEntry(t)) drawTokenEntryHalo(ctx, t, drawW, drawH);
 }
 
 // ============== 事件 icon 渲染 ==============
@@ -4106,6 +4394,72 @@ function drawEventIcon(ctx, ev) {
   }
 }
 
+function entryHaloColor(item) {
+  const entry = getEntryById(state.activeEntryId);
+  return entry?.color || state.theme.warn || '#fbbf24';
+}
+
+function drawScreenHalo(ctx, x, y, radius, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 14;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 5]);
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEventEntryHalo(ctx, ev) {
+  const [scx, scy] = mapToScreen(ev.x, ev.y);
+  drawScreenHalo(ctx, scx, scy, (ev.size / 2) + 8, entryHaloColor(ev));
+}
+
+function drawEntrySpotlightEvents(ctx) {
+  if (!state.activeEntryId) return;
+  const sorted = state.events.slice()
+    .filter((ev) => objectHasActiveEntry(ev))
+    .sort((a, b) => (a.zOrder || 0) - (b.zOrder || 0));
+  for (const ev of sorted) {
+    drawEventIcon(ctx, ev);
+    drawEventEntryHalo(ctx, ev);
+  }
+}
+
+function drawTokenEntryHalo(ctx, t, drawW, drawH) {
+  const dpr = state._dpr || 1;
+  const [scx, scy] = mapToScreen(t.x, t.y);
+  const color = entryHaloColor(t);
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (t.shape === 'circle') {
+    drawScreenHalo(ctx, scx, scy, (t.size / 2) * state.view.scale + 8, color);
+  } else {
+    const sw = drawW * state.view.scale;
+    const sh = drawH * state.view.scale;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 14;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 5]);
+    ctx.strokeRect(scx - sw / 2 - 8, scy - sh / 2 - 8, sw + 16, sh + 16);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = color;
+    ctx.fillRect(scx - sw / 2 - 8, scy - sh / 2 - 8, sw + 16, sh + 16);
+  }
+  ctx.restore();
+}
+
 function drawSelectedHighlight() {
   if (state.selectedTokenId) drawSelectedTokenHighlight();
   else if (state.selectedAnnotationId) drawSelectedAnnotationHighlight();
@@ -4159,7 +4513,7 @@ function drawSelectedEventHighlight() {
 function drawBrushPreview() {
   if (state.gridCalibration) return;
   if (!state.showBrushPreview || !state.hasMap) return;
-  if (state.uiMode !== 'normal' && state.uiMode !== 'present') return;
+  if (state.uiMode !== 'normal') return;
   if (state.cursorScreenX < 0) return;
   if (state.placeEventMode) return;
   const ctx = state.mainCtx;
@@ -4713,6 +5067,7 @@ async function createTokenFromFile(file, opts) {
     id: uuid(), imageBitmap: bitmap, blob: file,
     shape: opts.shape, borderColor: opts.borderColor, borderPattern: opts.borderPattern,
     name, x: cx, y: cy, size: baseSize, zOrder: state.tokens.length,
+    entryIds: normalizeEntryIds(opts.entryIds || []),
   };
   state.tokens.push(token);
   setSelectedObject('token', token.id, { render: false });
@@ -4729,6 +5084,7 @@ async function rebuildTokenFromSerialized(s) {
     id: s.id, imageBitmap: bitmap, blob: s.blob, shape: s.shape,
     borderColor: s.borderColor, borderPattern: s.borderPattern, name: s.name,
     x: s.x, y: s.y, size: s.size, zOrder: s.zOrder,
+    entryIds: cleanEntryIds(s.entryIds || []),
   };
 }
 
@@ -4908,6 +5264,7 @@ function isFogRevealedAt(layerKey, x, y) {
 }
 
 function isAnnotationVisible(ann) {
+  if (objectHasActiveEntry(ann)) return true;
   const mode = normalizeAnnotationMaskMode(ann.maskMode);
   if (mode === 'terrain') return isFogRevealedAt('terrain', ann.x, ann.y);
   if (mode === 'event') return isFogRevealedAt('event', ann.x, ann.y);
@@ -4955,6 +5312,24 @@ function drawAnnotation(ctx, ann) {
     }
   }
   ctx.restore();
+  if (objectHasActiveEntry(ann)) drawAnnotationEntryHalo(ctx, ann);
+}
+
+function drawAnnotationEntryHalo(ctx, ann) {
+  const b = annotationBounds(ann);
+  const color = entryHaloColor(ann);
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 12;
+  ctx.lineWidth = Math.max(2, 3 / Math.max(0.2, state.view.scale));
+  ctx.setLineDash([10 / Math.max(0.2, state.view.scale), 6 / Math.max(0.2, state.view.scale)]);
+  ctx.strokeRect(b.x - 8, b.y - 8, b.w + 16, b.h + 16);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.14;
+  ctx.fillStyle = color;
+  ctx.fillRect(b.x - 8, b.y - 8, b.w + 16, b.h + 16);
+  ctx.restore();
 }
 
 function drawSelectedAnnotationHighlight() {
@@ -4998,6 +5373,7 @@ function serializeAnnotation(ann) {
     x: ann.x, y: ann.y,
     maskMode: normalizeAnnotationMaskMode(ann.maskMode),
     zOrder: ann.zOrder || 0,
+    entryIds: objectEntryIds(ann),
   };
   if (ann.type === 'text') {
     return {
@@ -5031,6 +5407,7 @@ async function deserializeAnnotation(s) {
       width, height,
       maskMode,
       zOrder: s.zOrder || nextAnnotationZOrder(),
+      entryIds: cleanEntryIds(s.entryIds || []),
     };
   }
   return {
@@ -5042,6 +5419,7 @@ async function deserializeAnnotation(s) {
     outlineColor: s.outlineColor || state.theme.textOutline || 'rgba(0,0,0,0.85)',
     maskMode,
     zOrder: s.zOrder || nextAnnotationZOrder(),
+    entryIds: cleanEntryIds(s.entryIds || []),
   };
 }
 
@@ -5075,6 +5453,7 @@ function createTextAnnotation(opts) {
     outlineColor: opts.outlineColor || state.theme.textOutline || 'rgba(0,0,0,0.85)',
     maskMode: normalizeAnnotationMaskMode(opts.maskMode),
     zOrder: nextAnnotationZOrder(),
+    entryIds: normalizeEntryIds(opts.entryIds || []),
   };
   clampAnnotationToMap(ann);
   state.annotations.push(ann);
@@ -5101,6 +5480,7 @@ async function createImageAnnotationFromFile(file, opts) {
     height: width / ratio,
     maskMode: normalizeAnnotationMaskMode(opts.maskMode),
     zOrder: nextAnnotationZOrder(),
+    entryIds: normalizeEntryIds(opts.entryIds || []),
   };
   clampAnnotationToMap(ann);
   state.annotations.push(ann);
@@ -5123,6 +5503,7 @@ async function modifyAnnotation(id, changes) {
     if (changes.color !== undefined) ann.color = normalizeHex(changes.color || '#ffffff');
   }
   if (changes.maskMode !== undefined) ann.maskMode = normalizeAnnotationMaskMode(changes.maskMode);
+  if (changes.entryIds !== undefined) ann.entryIds = normalizeEntryIds(changes.entryIds);
   if (changes.width !== undefined) setAnnotationPrimarySize(ann, changes.width);
   clampAnnotationToMap(ann);
   pushUndo({ type: 'annotation-modify', id, before, after: serializeAnnotation(ann) });
@@ -5238,7 +5619,7 @@ function nextEventZOrder() {
 }
 
 function createEvent(opts) {
-  // opts: { x, y, icon, title, content, layer }
+  // opts: { x, y, icon, title, content, layer, entryIds }
   const ev = {
     id: uuid(),
     x: clamp(opts.x, 0, state.mapCanvas.width),
@@ -5249,6 +5630,7 @@ function createEvent(opts) {
     size: EVENT_DEFAULT_SIZE,
     zOrder: nextEventZOrder(),
     layer: (opts.layer === 0 ? 0 : 1),  // 0 = 永远可见；1 = 被事件 fog 遮（默认）
+    entryIds: normalizeEntryIds(opts.entryIds || []),
   };
   state.events.push(ev);
   setSelectedObject('event', ev.id, { render: false });
@@ -5287,6 +5669,7 @@ async function modifyEvent(id, changes) {
   if (changes.content !== undefined) ev.content = changes.content;
   if (changes.size !== undefined) ev.size = changes.size;
   if (changes.layer !== undefined) ev.layer = (changes.layer === 0 ? 0 : 1);
+  if (changes.entryIds !== undefined) ev.entryIds = normalizeEntryIds(changes.entryIds);
   pushUndo({ type: 'event-modify', id, before, after: serializeEvent(ev) });
   updateObjectPanel();
   scheduleRender('all');
@@ -5336,6 +5719,7 @@ function serializeEvent(ev) {
          : { type: 'emoji', value: ev.icon.value }),
     title: ev.title, content: ev.content, size: ev.size, zOrder: ev.zOrder,
     layer: (ev.layer === 0 ? 0 : 1),
+    entryIds: objectEntryIds(ev),
   };
 }
 
@@ -5358,6 +5742,7 @@ async function deserializeEvent(s) {
     size: s.size || EVENT_DEFAULT_SIZE,
     zOrder: s.zOrder || nextEventZOrder(),
     layer: (s.layer === 0 ? 0 : 1),  // 旧存档无 layer 字段，默认 1
+    entryIds: cleanEntryIds(s.entryIds || []),
   };
 }
 
@@ -5493,7 +5878,7 @@ function getCanvasOffset() {
 }
 
 function onPointerDown(e) {
-  if (state.uiMode === 'modal' || state.uiMode === 'present+modal') return;
+  if (state.uiMode === 'modal') return;
   if (!state.hasMap) return;
   state.mainCanvas.setPointerCapture(e.pointerId);
   const off = getCanvasOffset();
@@ -5763,7 +6148,7 @@ function onPointerUp(e) {
     state.lastEventClickId = info.eventId;
     state.lastEventClickTime = now;
     setSelectedObject('event', info.eventId, { render: false, keepEventCard: true });
-    if (isDouble && !state.presentMode && isEditSurface()) {
+    if (isDouble && isEditSurface()) {
       hideEventCard();
       openEventEditDialog(null, info.eventId);
     } else {
@@ -5844,7 +6229,7 @@ function onPinchMove() {
 // ============== 滚轮 ==============
 function onWheel(e) {
   if (!state.hasMap) return;
-  if (state.uiMode === 'modal' || state.uiMode === 'present+modal') return;
+  if (state.uiMode === 'modal') return;
   e.preventDefault();
   const off = getCanvasOffset();
   const x = e.clientX - off.x;
@@ -5953,12 +6338,11 @@ function onKeyDown(e) {
   }
 
   // modal 中只处理 ESC 关闭
-  if (state.uiMode === 'modal' || state.uiMode === 'present+modal') {
+  if (state.uiMode === 'modal') {
     if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
     return;
   }
 
-  // present 模式与选中态
   if (e.key === 'Escape') {
     if (state.placeEventMode) {
       togglePlaceEventMode(false);
@@ -5975,20 +6359,7 @@ function onKeyDown(e) {
       e.preventDefault();
       return;
     }
-    if (state.presentMode) {
-      const now = performance.now();
-      if (now - state.lastEscTime < 600) {
-        togglePresentMode(false);
-        state.lastEscTime = 0;
-      } else {
-        state.lastEscTime = now;
-        showToast('再按一次 Esc 退出演示模式');
-      }
-      e.preventDefault();
-      return;
-    }
   }
-  if (e.key === 'f' || e.key === 'F') { togglePresentMode(); e.preventDefault(); return; }
   if (e.key === 'e' || e.key === 'E') { setBrushMode('reveal'); e.preventDefault(); return; }
   if (e.key === 'r' || e.key === 'R') { setBrushMode('cover'); e.preventDefault(); return; }
   if (e.key === 'q' || e.key === 'Q') { setBrushMode('reveal-all'); e.preventDefault(); return; }
@@ -6062,33 +6433,9 @@ function togglePlaceEventMode(force) {
   if (state.activeStroke) onStrokeEnd(false);
   // 状态栏提示
   $('status-place-event').textContent = next ? '🎯 放置事件中 · 点击地图添加 · Esc 退出' : '';
-  // 演示模式下也要可见
   $('app').classList.toggle('placing-event', next);
   // 进入时弹一次 toast 强调
   if (next && !prev) showToast('放置事件模式：点击地图添加，Esc 退出', 3000);
-}
-
-// ============== 演示模式 ==============
-function togglePresentMode(force) {
-  if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
-  const next = (force === undefined) ? !state.presentMode : force;
-  if (next && isEditSurface()) {
-    state.surfaceMode = 'live';
-    hideObjectPanel();
-    updateSurfaceChrome();
-  }
-  state.presentMode = next;
-  $('app').classList.toggle('present-mode', next);
-  state.uiMode = next ? 'present' : 'normal';
-  if (!next) $('toolbar').classList.remove('peeked');
-  hideDropdown();
-}
-function peekToolbar() {
-  $('toolbar').classList.add('peeked');
-  clearTimeout(state.toolbarPeekTimer);
-  state.toolbarPeekTimer = setTimeout(() => {
-    if (state.presentMode) $('toolbar').classList.remove('peeked');
-  }, 2500);
 }
 
 // ============== Modal ==============
@@ -6096,13 +6443,13 @@ function showModal(html, opts) {
   const root = $('modal-root');
   root.innerHTML = '<div class="modal-card">' + html + '</div>';
   root.classList.add('visible');
-  state.uiMode = state.presentMode ? 'present+modal' : 'modal';
+  state.uiMode = 'modal';
   if (opts && opts.onMounted) opts.onMounted(root);
 }
 function closeModal() {
   $('modal-root').classList.remove('visible');
   $('modal-root').innerHTML = '';
-  state.uiMode = state.presentMode ? 'present' : 'normal';
+  state.uiMode = 'normal';
 }
 function showConfirm(title, desc, onYes, opts) {
   opts = opts || {};
@@ -6168,12 +6515,15 @@ function resetSceneWithPreparedMap(sceneId, file, preparedMap, nextFingerprint, 
   scene.mapSource = null;
   scene.mapSize = { w, h };
   scene.mapFingerprint = nextFingerprint;
+  scene.entries = [];
   state.currentSceneId = sceneId;
   clearAnnotationRuntimeResources();
   state.tokens = []; state.events = []; state.annotations = [];
+  state.entries = [];
+  state.activeEntryId = null;
   clearSelection({ render: false });
   state.undoStack = [];
-  updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton();
+  updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateEntryButton(); updateUndoButton();
   refreshSelectionUi();
   fitView();
   setupBrushSizeFromState();
@@ -6195,16 +6545,19 @@ function createSceneWithPreparedMap(file, preparedMap, nextFingerprint, w, h) {
     mapSource: null,
     mapFingerprint: nextFingerprint,
     mapSize: { w, h },
+    entries: [],
     createdAt: Date.now(),
     lastUsedAt: Date.now(),
   };
   state.currentSceneId = newId;
   clearAnnotationRuntimeResources();
   state.tokens = []; state.events = []; state.annotations = [];
+  state.entries = [];
+  state.activeEntryId = null;
   clearSelection({ render: false });
   state.undoStack = [];
   state.grid = defaultGridSettings();
-  updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateUndoButton();
+  updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus(); updateEntryButton(); updateUndoButton();
   refreshSelectionUi();
   promptInitialFog();
 }
@@ -6404,21 +6757,26 @@ async function prepareSavedRestore(saved, mapSize) {
     const pair = await decodeAndValidateFogPair(saved, mapSize);
     terrainBmp = pair.terrainBmp;
     eventFogBmp = pair.eventFogBmp;
+    const entries = normalizeEntries(saved.entries || []);
     const tokens = [];
     for (const s of (saved.tokens || [])) {
+      s.entryIds = normalizeEntryIdsForEntries(s.entryIds || [], entries);
       tokens.push(await rebuildTokenFromSerialized(s));
     }
     const events = [];
     for (const s of (saved.events || [])) {
+      s.entryIds = normalizeEntryIdsForEntries(s.entryIds || [], entries);
       events.push(await deserializeEvent(s));
     }
     const annotations = [];
     for (const s of (saved.annotations || [])) {
+      s.entryIds = normalizeEntryIdsForEntries(s.entryIds || [], entries);
       annotations.push(await deserializeAnnotation(s));
     }
     return {
       terrainBmp, eventFogBmp,
       tokens, events, annotations,
+      entries,
       view: saved.view || null,
       settings: normalizeRestoredSettings(saved.settings),
       customTheme: saved.customTheme || null,
@@ -6438,6 +6796,9 @@ function applyPreparedRestore(prepared, opts = {}) {
     state.tokens = prepared.tokens;
     state.events = prepared.events;
     state.annotations = prepared.annotations || [];
+    state.entries = normalizeEntries(prepared.entries || []);
+    state.activeEntryId = null;
+    pruneEntryReferences();
     clearSelection({ render: false });
     applyRestoredView(prepared.view, opts);
     if (prepared.settings) {
@@ -6461,6 +6822,7 @@ function applyPreparedRestore(prepared, opts = {}) {
     state.undoStack = [];
     updateUndoButton();
     updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus();
+    updateEntryButton();
     refreshSelectionUi();
     updateZoomStatus();
     scheduleRender('all');
@@ -6511,12 +6873,12 @@ function hideLoading() {
   }
 }
 
-// ============== 云存档（v3.13.0） ==============
+// ============== 云存档（v3.14.0） ==============
 const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.13.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.14.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 5;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -8166,6 +8528,7 @@ function openTokenUploadDialog(file, existingId) {
   const initShape = editing ? editing.shape : 'circle';
   const initColor = editing ? editing.borderColor : '#3b82f6';
   const initName = editing ? editing.name : '';
+  const initEntryIds = editing ? editing.entryIds : [];
   showModal(`
     <div class="modal-title">${editing ? '编辑 Token' : '添加 Token'}</div>
     <div id="token-preview"></div>
@@ -8190,6 +8553,7 @@ function openTokenUploadDialog(file, existingId) {
       <label>名字（可选）</label>
       <input id="token-name" type="text" maxlength="40" placeholder="留空不显示标签">
     </div>
+    ${entryAssignmentHTML(initEntryIds)}
     <div class="modal-actions">
       <button id="token-cancel">取消</button>
       <button id="token-confirm" class="primary">${editing ? '保存' : '添加'}</button>
@@ -8216,6 +8580,7 @@ function openTokenUploadDialog(file, existingId) {
         });
       });
       if (selShape === 'circle') preview.style.borderRadius = '50%';
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
 
       let selColor = initColor;
       let selPattern = editing ? editing.borderPattern : 'solid';
@@ -8235,7 +8600,7 @@ function openTokenUploadDialog(file, existingId) {
       $('token-cancel').addEventListener('click', () => { cleanup(); closeModal(); });
       $('token-confirm').addEventListener('click', async () => {
         const name = $('token-name').value.trim();
-        const opts = { shape: selShape, borderColor: selColor || null, borderPattern: selPattern, name };
+        const opts = { shape: selShape, borderColor: selColor || null, borderPattern: selPattern, name, entryIds: getEntryIds() };
         cleanup();
         closeModal();
         if (editing) {
@@ -8243,7 +8608,9 @@ function openTokenUploadDialog(file, existingId) {
           editing.borderColor = opts.borderColor;
           editing.borderPattern = opts.borderPattern;
           editing.name = opts.name;
+          editing.entryIds = opts.entryIds;
           scheduleRender('all');
+          updateObjectPanel();
           triggerImmediateSave();
         } else {
           if (!file) return;
@@ -8268,6 +8635,7 @@ function openEventEditDialog(file, eventId, mapX, mapY) {
     : { type: 'emoji', value: DEFAULT_EMOJIS[0] };
   const initTitle = editing ? editing.title : '';
   const initContent = editing ? editing.content : '';
+  const initEntryIds = editing ? editing.entryIds : [];
   showModal(`
     <div class="modal-title">${editing ? '编辑事件' : '添加事件'}</div>
     <div id="event-icon-preview"></div>
@@ -8307,6 +8675,7 @@ function openEventEditDialog(file, eventId, mapX, mapY) {
         <button class="option-btn" data-layer="0">永远可见（剧情关键信息）</button>
       </div>
     </div>
+    ${entryAssignmentHTML(initEntryIds)}
     <div class="modal-actions">
       ${editing ? '<button id="event-delete-in-edit" class="danger">删除</button>' : ''}
       <button id="event-cancel">取消</button>
@@ -8315,6 +8684,7 @@ function openEventEditDialog(file, eventId, mapX, mapY) {
   `, {
     onMounted: () => {
       let curIcon = initIcon;
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
       let imageBlobUrl = null;
       let pendingImageBlob = (initIcon.type === 'image' ? initIcon.blob : null);
 
@@ -8461,15 +8831,16 @@ function openEventEditDialog(file, eventId, mapX, mapY) {
       $('event-confirm').addEventListener('click', async () => {
         const title = $('event-title').value.trim();
         const content = $('event-content').value;
+        const entryIds = getEntryIds();
         cleanup(); closeModal();
         if (editing) {
-          await modifyEvent(eventId, { icon: curIcon, title, content, layer: selLayer });
+          await modifyEvent(eventId, { icon: curIcon, title, content, layer: selLayer, entryIds });
           scheduleRender('all');
         } else {
           createEvent({
             x: mapX != null ? mapX : state.mapCanvas.width / 2,
             y: mapY != null ? mapY : state.mapCanvas.height / 2,
-            icon: curIcon, title, content, layer: selLayer,
+            icon: curIcon, title, content, layer: selLayer, entryIds,
           });
         }
       });
@@ -8498,6 +8869,7 @@ function openTextAnnotationDialog(annotationId, mapX, mapY) {
   const initSize = editing ? editing.fontSize : ANNOTATION_DEFAULT_TEXT_SIZE;
   const initColor = editing ? editing.color : '#ffffff';
   const initMask = editing ? editing.maskMode : 'public';
+  const initEntryIds = editing ? editing.entryIds : [];
   showModal(`
     <div class="modal-title">${editing ? '编辑文字标注' : '添加文字标注'}</div>
     <div class="form-row">
@@ -8516,6 +8888,7 @@ function openTextAnnotationDialog(annotationId, mapX, mapY) {
       <label>遮罩规则</label>
       ${annotationMaskSelectHTML(initMask)}
     </div>
+    ${entryAssignmentHTML(initEntryIds)}
     <div class="modal-actions">
       ${editing ? '<button id="annotation-delete-in-edit" class="danger">删除</button>' : ''}
       <button id="annotation-cancel">取消</button>
@@ -8523,6 +8896,7 @@ function openTextAnnotationDialog(annotationId, mapX, mapY) {
     </div>
   `, {
     onMounted: () => {
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
       $('annotation-cancel').addEventListener('click', closeModal);
       const delBtn = $('annotation-delete-in-edit');
       if (delBtn) {
@@ -8541,11 +8915,12 @@ function openTextAnnotationDialog(annotationId, mapX, mapY) {
         if (!color.startsWith('#')) color = '#' + color;
         color = normalizeHex(color);
         const maskMode = normalizeAnnotationMaskMode($('annotation-mask-mode').value);
+        const entryIds = getEntryIds();
         closeModal();
         if (editing) {
-          await modifyAnnotation(annotationId, { text, fontSize, color, maskMode });
+          await modifyAnnotation(annotationId, { text, fontSize, color, maskMode, entryIds });
         } else {
-          createTextAnnotation({ text, fontSize, color, maskMode, x: mapX, y: mapY });
+          createTextAnnotation({ text, fontSize, color, maskMode, entryIds, x: mapX, y: mapY });
         }
       });
     }
@@ -8558,6 +8933,7 @@ function openImageAnnotationDialog(file, annotationId, mapX, mapY) {
   const editing = annotationId ? state.annotations.find((a) => a.id === annotationId && a.type === 'image') : null;
   const initWidth = editing ? editing.width : ANNOTATION_DEFAULT_IMAGE_WIDTH;
   const initMask = editing ? editing.maskMode : 'public';
+  const initEntryIds = editing ? editing.entryIds : [];
   const fileName = file ? file.name : '当前图片';
   showModal(`
     <div class="modal-title">${editing ? '编辑图片标注' : '添加图片标注'}</div>
@@ -8573,6 +8949,7 @@ function openImageAnnotationDialog(file, annotationId, mapX, mapY) {
       <label>遮罩规则</label>
       ${annotationMaskSelectHTML(initMask)}
     </div>
+    ${entryAssignmentHTML(initEntryIds)}
     <div class="modal-actions">
       ${editing ? '<button id="annotation-delete-in-edit" class="danger">删除</button>' : ''}
       <button id="annotation-cancel">取消</button>
@@ -8580,6 +8957,7 @@ function openImageAnnotationDialog(file, annotationId, mapX, mapY) {
     </div>
   `, {
     onMounted: () => {
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
       $('annotation-cancel').addEventListener('click', closeModal);
       const delBtn = $('annotation-delete-in-edit');
       if (delBtn) {
@@ -8594,12 +8972,13 @@ function openImageAnnotationDialog(file, annotationId, mapX, mapY) {
       $('annotation-confirm').addEventListener('click', async () => {
         const width = clamp(parseInt($('annotation-image-width').value, 10) || ANNOTATION_DEFAULT_IMAGE_WIDTH, ANNOTATION_MIN_SIZE, ANNOTATION_MAX_SIZE);
         const maskMode = normalizeAnnotationMaskMode($('annotation-mask-mode').value);
+        const entryIds = getEntryIds();
         closeModal();
         if (editing) {
-          await modifyAnnotation(annotationId, { width, maskMode });
+          await modifyAnnotation(annotationId, { width, maskMode, entryIds });
         } else if (file) {
           setLoading('添加图片标注中…');
-          try { await createImageAnnotationFromFile(file, { width, maskMode, x: mapX, y: mapY }); }
+          try { await createImageAnnotationFromFile(file, { width, maskMode, entryIds, x: mapX, y: mapY }); }
           catch (e) { showToast('添加失败：' + (e.message || e)); }
           hideLoading();
         }
@@ -8621,6 +9000,7 @@ function eventQuickMatches(ev, query) {
     ev.title || '',
     ev.content || '',
     ev.icon?.type === 'emoji' ? ev.icon.value : '',
+    objectEntryNames(ev).join(' '),
     ev.layer === 0 ? '公开 显露 上层' : '隐藏 事件雾 遮罩',
   ].join(' ').toLowerCase().includes(query);
 }
@@ -8700,6 +9080,146 @@ function openEventQuickToggleModal() {
       $('event-quick-close').addEventListener('click', closeModal);
       renderEventQuickList('');
       input.focus();
+    }
+  });
+}
+
+// ============== 词条聚光 ==============
+function openEntrySpotlightModal() {
+  if (!state.hasMap) { showToast('请先加载地图'); return; }
+  pruneEntryReferences();
+  const counts = collectEntryCounts();
+  const canManage = isEditSurface();
+  const entries = (state.entries || []).filter((entry) => {
+    if (canManage) return true;
+    const row = counts.get(entry.id);
+    return entry.livePicker !== false && row && row.total > 0;
+  });
+  const rows = entries.map((entry) => {
+    const row = counts.get(entry.id) || { event: 0, token: 0, annotation: 0, total: 0 };
+    const active = state.activeEntryId === entry.id;
+    return `
+      <button class="info-tag-row${active ? ' active' : ''}" data-entry-id="${escapeHtml(entry.id)}">
+        <span style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <span class="entry-color-dot" style="background:${escapeHtml(entry.color)}"></span>
+          <span class="info-tag-name">${escapeHtml(entry.name)}</span>
+        </span>
+        <span class="info-tag-count">${canManage ? `${row.total} 项` : (active ? '已显露' : '选择')}</span>
+      </button>
+    `;
+  }).join('');
+  const title = state.activeEntryId ? `词条聚光：${escapeHtml(getEntryById(state.activeEntryId)?.name || '已选择')}` : '词条聚光';
+  showModal(`
+    <div class="modal-title">${title}</div>
+    <div class="modal-desc">${canManage ? '选择一个词条可临时显露并高亮它关联的事件、Token 和标注；管理入口只在编辑态开放。' : '选择一个现场词条，只临时显露和高亮，不会改迷雾。'}</div>
+    <div class="info-tag-list">${rows || '<div class="object-empty">当前场景还没有可用词条。</div>'}</div>
+    <div class="modal-actions">
+      ${canManage ? '<button id="entry-manage">管理词条</button>' : ''}
+      <button id="entry-clear">清除聚光</button>
+      <button id="entry-close" class="primary">关闭</button>
+    </div>
+  `, {
+    onMounted: () => {
+      document.querySelectorAll('.info-tag-row[data-entry-id]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.entryId;
+          setActiveEntry(state.activeEntryId === id ? null : id);
+          closeModal();
+          openEntrySpotlightModal();
+        });
+      });
+      const manage = $('entry-manage');
+      if (manage) manage.addEventListener('click', () => { closeModal(); openEntryManagerModal(); });
+      $('entry-clear').addEventListener('click', () => { setActiveEntry(null); closeModal(); showToast('词条聚光已关闭'); });
+      $('entry-close').addEventListener('click', closeModal);
+    }
+  });
+}
+
+function openEntryManagerModal() {
+  if (!requireEditSurface()) return;
+  pruneEntryReferences();
+  const counts = collectEntryCounts();
+  const rows = (state.entries || []).map((entry) => {
+    const row = counts.get(entry.id) || { total: 0 };
+    return `
+      <div class="entry-manager-row" data-entry-id="${escapeHtml(entry.id)}">
+        <span class="entry-color-dot" style="background:${escapeHtml(entry.color)}"></span>
+        <input class="entry-manager-name" type="text" maxlength="40" value="${escapeHtml(entry.name)}">
+        <input class="entry-manager-color" type="text" maxlength="7" value="${escapeHtml(entry.color)}">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input class="entry-manager-live" type="checkbox"${entry.livePicker !== false ? ' checked' : ''}> 跑团</label>
+        <button class="entry-manager-delete danger" type="button" ${row.total ? '' : ''}>删除</button>
+      </div>
+    `;
+  }).join('');
+  showModal(`
+    <div class="modal-title">管理词条</div>
+    <div class="modal-desc">跑团勾选决定这个词条是否出现在现场选择器里。删除词条会从所有对象上移除它。</div>
+    <div class="entry-manager-list">${rows || '<div class="object-empty">暂无词条。可在对象编辑弹窗里新建。</div>'}</div>
+    <div class="form-row" style="margin-top:10px;">
+      <label>新建词条</label>
+      <div class="entry-new-row">
+        <input id="entry-manager-new-name" type="text" maxlength="40" placeholder="词条名">
+        <button id="entry-manager-new-add" type="button">新建</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="entry-manager-close">关闭</button>
+      <button id="entry-manager-save" class="primary">保存</button>
+    </div>
+  `, {
+    onMounted: () => {
+      $('entry-manager-new-add').addEventListener('click', () => {
+        const entry = createEntry($('entry-manager-new-name').value);
+        if (entry) { closeModal(); openEntryManagerModal(); }
+      });
+      $('entry-manager-close').addEventListener('click', closeModal);
+      document.querySelectorAll('.entry-manager-delete').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const row = btn.closest('.entry-manager-row');
+          const id = row?.dataset.entryId;
+          const entry = getEntryById(id);
+          if (!entry) return;
+          showConfirm('删除词条', `确定删除"${entry.name}"？它会从所有对象上移除。`, () => {
+            state.entries = state.entries.filter((e) => e.id !== id);
+            state.events.forEach((item) => item.entryIds = objectEntryIds(item).filter((x) => x !== id));
+            state.tokens.forEach((item) => item.entryIds = objectEntryIds(item).filter((x) => x !== id));
+            state.annotations.forEach((item) => item.entryIds = objectEntryIds(item).filter((x) => x !== id));
+            if (state.activeEntryId === id) state.activeEntryId = null;
+            updateEntryButton();
+            updateObjectPanel();
+            scheduleRender('all');
+            triggerImmediateSave();
+            openEntryManagerModal();
+          }, { danger: true, yesText: '删除', onNo: () => openEntryManagerModal() });
+        });
+      });
+      $('entry-manager-save').addEventListener('click', () => {
+        const seen = new Set();
+        let ok = true;
+        document.querySelectorAll('.entry-manager-row').forEach((row, idx) => {
+          const id = row.dataset.entryId;
+          const entry = getEntryById(id);
+          if (!entry) return;
+          const name = normalizeEntryName(row.querySelector('.entry-manager-name')?.value);
+          const key = entryNameKey(name);
+          if (!name || seen.has(key)) { ok = false; return; }
+          seen.add(key);
+          entry.name = name;
+          entry.color = normalizeHex(row.querySelector('.entry-manager-color')?.value || entry.color);
+          entry.livePicker = !!row.querySelector('.entry-manager-live')?.checked;
+          entry.sortOrder = idx;
+          entry.updatedAt = Date.now();
+        });
+        if (!ok) { showToast('词条名不能为空，也不能重名'); return; }
+        state.entries = normalizeEntries(state.entries);
+        updateEntryButton();
+        updateObjectPanel();
+        scheduleRender('all');
+        triggerImmediateSave();
+        closeModal();
+        showToast('词条已保存');
+      });
     }
   });
 }
@@ -9036,6 +9556,7 @@ async function init() {
   updateTokensStatus();
   updateEventsStatus();
   updateAnnotationsStatus();
+  updateEntryButton();
   updateZoomStatus();
   updateSceneStatus();
   cloudSync_bootstrap();
@@ -9043,6 +9564,7 @@ async function init() {
   // v3: 启动时尝试自动加载 currentScene（如果它有 mapBlob）
   await tryAutoLoadCurrentScene();
   updateSceneStatus();
+  updateEntryButton();
   updateObjectPanel();
 }
 
@@ -9099,23 +9621,23 @@ function setupEventListeners() {
 
   // 双击：先尝试编辑事件 → 再尝试编辑 token → 否则 fitView
   cv.addEventListener('dblclick', (e) => {
-    if (state.uiMode !== 'normal' && state.uiMode !== 'present') return;
+    if (state.uiMode !== 'normal') return;
     const off = getCanvasOffset();
     const x = e.clientX - off.x, y = e.clientY - off.y;
     const hitEvent = findTopEventAt(x, y, e.pointerType || 'mouse');
-    if (hitEvent && !state.presentMode && isEditSurface()) {
+    if (hitEvent && isEditSurface()) {
       hideEventCard();
       openEventEditDialog(null, hitEvent.id);
       return;
     }
     const [mx, my] = screenToMap(x, y);
     const hitToken = findTopTokenAt(mx, my);
-    if (hitToken && !state.presentMode && isEditSurface()) {
+    if (hitToken && isEditSurface()) {
       openEditTokenModal(hitToken.id);
       return;
     }
     const hitAnnotation = findTopAnnotationAt(mx, my);
-    if (hitAnnotation && !state.presentMode && isEditSurface()) {
+    if (hitAnnotation && isEditSurface()) {
       openAnnotationEditDialog(hitAnnotation.id);
       return;
     }
@@ -9230,25 +9752,8 @@ function setupEventListeners() {
   });
 
   $('btn-surface-toggle').addEventListener('click', () => setSurfaceMode(isEditSurface() ? 'live' : 'edit'));
-  $('btn-present').addEventListener('click', () => togglePresentMode());
-  $('present-handle').addEventListener('click', () => togglePresentMode(false));
+  $('btn-entry-spotlight').addEventListener('click', openEntrySpotlightModal);
   $('btn-edit-chapter').addEventListener('click', openChapterModal);
-
-  $('top-hover-zone').addEventListener('pointerenter', peekToolbar);
-  $('top-hover-zone').addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse') return;
-    peekToolbar();
-  });
-  let topPull = null;
-  $('top-hover-zone').addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') return;
-    topPull = { startY: e.clientY };
-  });
-  $('top-hover-zone').addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'mouse' || !topPull) return;
-    if (e.clientY - topPull.startY > 30) { peekToolbar(); topPull = null; }
-  });
-  $('top-hover-zone').addEventListener('pointerup', () => { topPull = null; });
 
   $('btn-more').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -9275,7 +9780,7 @@ function setupEventListeners() {
       showToast('请先完成或取消网格校准');
       return;
     }
-    if (state.uiMode === 'modal' || state.uiMode === 'present+modal') {
+    if (state.uiMode === 'modal') {
       showToast('请先关闭当前弹窗');
       return;
     }
@@ -9306,3 +9811,4 @@ window.__fogState = state;
 </script>
 </body>
 </html>
+
