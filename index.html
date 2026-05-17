@@ -3098,14 +3098,15 @@ function sceneNeedsLocalMap(scene) {
 
 function sceneMapRuntimeFields(prev) {
   const hasBlob = Boolean(prev && prev.mapBlob);
+  const manualRemoteSource = prev?.mapSource?.type === 'manualRemote' ? { ...prev.mapSource } : null;
   return {
     mapBlob: hasBlob ? prev.mapBlob : null,
     mapMissing: hasBlob ? false : Boolean(prev && (prev.mapMissing || prev.mapSource?.type === 'placeholder')),
-    mapSource: hasBlob ? null : (prev && prev.mapSource ? { ...prev.mapSource } : null),
+    mapSource: hasBlob ? manualRemoteSource : (prev && prev.mapSource ? { ...prev.mapSource } : null),
   };
 }
 
-function createPlaceholderPreparedMap(mapSize, label = '本机地图待绑定') {
+function createPlaceholderPreparedMap(mapSize, label = '地图待绑定') {
   if (!isValidMapSize(mapSize)) throw new Error('缺少地图尺寸，无法创建占位地图');
   const w = Math.round(mapSize.w);
   const h = Math.round(mapSize.h);
@@ -3740,7 +3741,7 @@ async function switchScene(targetId) {
     setupBrushSizeFromState();
     updateSceneStatus();
     triggerImmediateSave();
-    const suffix = sceneNeedsLocalMap(target) ? '（占位地图，需绑定本机原图）' : '';
+    const suffix = sceneNeedsLocalMap(target) ? '（占位地图，需绑定地图）' : '';
     showToast('已切换到 "' + (target.name || '场景') + '"' + suffix, 2600);
   } catch (e) {
     console.error(e);
@@ -6553,7 +6554,7 @@ async function validateSceneFogForPreparedMap(scene, w, h) {
   if (pair.eventFogBmp && typeof pair.eventFogBmp.close === 'function') pair.eventFogBmp.close();
 }
 
-async function restoreSceneWithPreparedMap(sceneId, file, preparedMap, nextFingerprint, w, h) {
+async function restoreSceneWithPreparedMap(sceneId, file, preparedMap, nextFingerprint, w, h, opts = {}) {
   const scene = state.scenes[sceneId];
   if (!scene) { showToast('场景不存在'); return; }
   try {
@@ -6562,7 +6563,7 @@ async function restoreSceneWithPreparedMap(sceneId, file, preparedMap, nextFinge
     state.mapFingerprint = nextFingerprint;
     scene.mapBlob = file;
     scene.mapMissing = false;
-    scene.mapSource = null;
+    scene.mapSource = opts.mapSource || null;
     scene.mapSize = { w, h };
     scene.mapFingerprint = nextFingerprint;
     state.currentSceneId = sceneId;
@@ -6949,19 +6950,20 @@ function hideLoading() {
   }
 }
 
-// ============== 云存档（v3.14.0） ==============
+// ============== 云存档（v3.16.0） ==============
 const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.14.0';
-const CLOUD_SYNC_SCHEMA_VERSION = 5;
-const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5]);
+const CLOUD_SYNC_TOOL_VERSION = 'v3.16.0';
+const CLOUD_SYNC_SCHEMA_VERSION = 6;
+const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
 const CLOUD_SYNC_MAP_CACHE_PREFIX = 'cloudSync:map:';
 const CLOUD_SYNC_PENDING_PREFIX = 'pending';
 const CLOUD_SYNC_SNAPSHOTS_PREFIX = 'snapshots';
 const CLOUD_SYNC_MAPS_PREFIX = 'maps';
+const CLOUD_SYNC_MANUAL_MAPS_PREFIX = 'manual-maps';
 const CLOUD_SYNC_ACCEPT_JSON = 'application/vnd.github+json';
 const CLOUD_SYNC_ACCEPT_RAW = 'application/vnd.github.raw+json';
 const CLOUD_SYNC_SINGLE_LIMIT = 1 * 1024 * 1024;
@@ -7059,8 +7061,13 @@ function cloudSync_formatBytes(bytes) {
 function cloudSync_isPlaceholderMapEntry(entry) {
   return Boolean(entry && (entry.storage === 'placeholder' || entry.placeholder || entry.requires_local_file));
 }
+function cloudSync_isManualRemoteMapEntry(entry) {
+  return Boolean(entry && (entry.storage === 'manualRemote' || entry.map_source_type === 'manualRemote'));
+}
 function cloudSync_isRemoteMapEntry(entry) {
-  return Boolean(entry && !cloudSync_isPlaceholderMapEntry(entry) && entry.map_sha256 && entry.map_path);
+  if (!entry || cloudSync_isPlaceholderMapEntry(entry)) return false;
+  if (cloudSync_isManualRemoteMapEntry(entry)) return Boolean(entry.map_path);
+  return Boolean(entry.map_sha256 && entry.map_path);
 }
 function cloudSync_buildPlaceholderMapSource(scene, info = {}) {
   const source = scene?.mapSource && scene.mapSource.type === 'placeholder'
@@ -7079,6 +7086,21 @@ function cloudSync_buildPlaceholderMapSource(scene, info = {}) {
   };
 }
 function cloudSync_mapSourceFromManifest(mapMeta) {
+  if (cloudSync_isManualRemoteMapEntry(mapMeta)) {
+    return {
+      type: 'manualRemote',
+      path: mapMeta.map_path || '',
+      name: mapMeta.manual_name || mapMeta.scene_name || '云端地图',
+      size: mapMeta.original_bytes || mapMeta.stored_bytes || 0,
+      sha: mapMeta.map_sha256 || '',
+      mime: mapMeta.mime || cloudSync_guessMimeFromPath(mapMeta.map_path || ''),
+      mapSize: isValidMapSize({ w: mapMeta.downsampled_w, h: mapMeta.downsampled_h })
+        ? { w: mapMeta.downsampled_w, h: mapMeta.downsampled_h }
+        : null,
+      mapFingerprint: mapMeta.map_fingerprint || null,
+      linkedAt: mapMeta.created_at || null,
+    };
+  }
   if (!cloudSync_isPlaceholderMapEntry(mapMeta)) return null;
   return {
     type: 'placeholder',
@@ -7092,6 +7114,19 @@ function cloudSync_mapSourceFromManifest(mapMeta) {
     mapFingerprint: mapMeta.map_fingerprint || null,
     sceneName: mapMeta.scene_name || '',
     skippedAt: mapMeta.created_at || null,
+  };
+}
+function cloudSync_buildManualRemoteMapSource(manualMap, info = {}) {
+  return {
+    type: 'manualRemote',
+    path: manualMap.path,
+    name: manualMap.name || manualMap.path || '云端地图',
+    size: manualMap.size || 0,
+    sha: manualMap.sha || '',
+    mime: manualMap.mime || cloudSync_guessMimeFromPath(manualMap.path || manualMap.name),
+    mapSize: info.mapSize || manualMap.mapSize || null,
+    mapFingerprint: info.mapFingerprint || manualMap.mapFingerprint || null,
+    linkedAt: info.linkedAt || new Date().toISOString(),
   };
 }
 function cloudSync_setBusy(flag) {
@@ -7236,6 +7271,22 @@ async function cloudSync_getRawTextFile({ owner, repo, token, path, allowMissing
     throw err;
   }
 }
+async function cloudSync_getRawBlobFile({ owner, repo, token, path, allowMissing = false, mime = '' }) {
+  const encodedPath = cloudSync_encodePath(path);
+  try {
+    const response = await cloudSync_fetchApi(`/repos/${owner}/${repo}/contents/${encodedPath}`, {
+      method: 'GET',
+      headers: { Accept: CLOUD_SYNC_ACCEPT_RAW },
+    }, { owner, repo, token });
+    if (response.status === 404 && allowMissing) return null;
+    if (!response.ok) throw cloudSync_makeError(await cloudSync_classifyError(response));
+    const blob = await response.blob();
+    return blob.type || !mime ? blob : new Blob([await blob.arrayBuffer()], { type: mime });
+  } catch (err) {
+    if (allowMissing && err && err.code === 'repoNotFound') return null;
+    throw err;
+  }
+}
 async function cloudSync_listContents({ owner, repo, token, path = '', allowMissing = false }) {
   const encodedPath = cloudSync_encodePath(path);
   const suffix = encodedPath ? `/contents/${encodedPath}` : '/contents';
@@ -7249,6 +7300,30 @@ async function cloudSync_listContents({ owner, repo, token, path = '', allowMiss
     if (allowMissing && err && err.code === 'repoNotFound') return [];
     throw err;
   }
+}
+function cloudSync_isManualMapFile(entry) {
+  if (!entry || entry.type !== 'file') return false;
+  return /\.(png|jpe?g|webp)$/i.test(entry.name || entry.path || '');
+}
+function cloudSync_guessMimeFromPath(path) {
+  const lower = String(path || '').toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  return 'application/octet-stream';
+}
+async function cloudSync_listManualMaps({ owner, repo, token }) {
+  const files = await cloudSync_listContents({ owner, repo, token, path: CLOUD_SYNC_MANUAL_MAPS_PREFIX, allowMissing: true });
+  return files
+    .filter(cloudSync_isManualMapFile)
+    .map((entry) => ({
+      name: entry.name || entry.path || '地图',
+      path: entry.path,
+      size: entry.size || 0,
+      sha: entry.sha || '',
+      mime: cloudSync_guessMimeFromPath(entry.path || entry.name),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 }
 async function cloudSync_putTextFile({ owner, repo, token, path, text, sha = null, message = null }) {
   const encodedPath = cloudSync_encodePath(path);
@@ -7341,6 +7416,26 @@ async function cloudSync_collectMapBlobs() {
   for (const [sceneId, scene] of Object.entries(state.scenes || {})) {
     if (!scene || (!scene.mapBlob && !sceneNeedsLocalMap(scene))) {
       throw cloudSync_makeError({ code: 'missingMap', userMessage: `场景"${scene?.name || sceneId || '未命名'}"还没有地图，暂时不能上传云端。` });
+    }
+    if (scene.mapSource?.type === 'manualRemote' && scene.mapSource.path) {
+      entries.push({
+        sceneId,
+        sceneName: scene.name || '场景',
+        storage: 'manualRemote',
+        status: 'referenced',
+        reason: null,
+        sha256: scene.mapSource.sha || null,
+        blob: null,
+        bytes: null,
+        byteSize: 0,
+        originalByteSize: scene.mapSource.size || scene.mapBlob?.size || 0,
+        mime: scene.mapSource.mime || scene.mapBlob?.type || cloudSync_guessMimeFromPath(scene.mapSource.path),
+        originalMime: scene.mapSource.mime || scene.mapBlob?.type || '',
+        mapSize: scene.mapSize || scene.mapSource.mapSize || null,
+        mapFingerprint: scene.mapFingerprint || scene.mapSource.mapFingerprint || null,
+        mapSource: { ...scene.mapSource },
+      });
+      continue;
     }
     if (sceneNeedsLocalMap(scene)) {
       entries.push({
@@ -7492,6 +7587,7 @@ async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
     const pair = await decodeAndValidateFogPair(saved, { w: preparedMap.w, h: preparedMap.h });
     if (pair.terrainBmp && typeof pair.terrainBmp.close === 'function') pair.terrainBmp.close();
     if (pair.eventFogBmp && typeof pair.eventFogBmp.close === 'function') pair.eventFogBmp.close();
+    const preservedMapSource = scenePayload.mapSource?.type === 'manualRemote' ? scenePayload.mapSource : null;
     preparedEntries.push({
       newId: sceneId,
       preparedMap,
@@ -7499,12 +7595,12 @@ async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
         ...saved,
         mapBlob: mapBlob || null,
         mapMissing: !mapBlob,
-        mapSource: mapBlob ? null : (scenePayload.mapSource || cloudSync_buildPlaceholderMapSource(saved, {
+        mapSource: preservedMapSource || (mapBlob ? null : (scenePayload.mapSource || cloudSync_buildPlaceholderMapSource(saved, {
           reason: 'local-map-required',
           mapSize: scenePayload.mapSize || { w: preparedMap.w, h: preparedMap.h },
           mapFingerprint: scenePayload.mapFingerprint || null,
           sceneName: scenePayload.name || '',
-        })),
+        }))),
         mapFingerprint: scenePayload.mapFingerprint || null,
         mapSize: { w: preparedMap.w, h: preparedMap.h },
         name: scenePayload.name || '导入场景',
@@ -7565,7 +7661,7 @@ function cloudSync_buildManifest({ snapshotId, mapsList, stateChunks, bundleJson
   const tokenCount = scenes.reduce((sum, scene) => sum + ((scene.tokens || []).length), 0);
   const eventCount = scenes.reduce((sum, scene) => sum + ((scene.events || []).length), 0);
   const annotationCount = scenes.reduce((sum, scene) => sum + ((scene.annotations || []).length), 0);
-  const uniqueSha = new Set(mapsList.filter((item) => item.storage !== 'placeholder' && item.sha256).map((item) => item.sha256));
+  const uniqueSha = new Set(mapsList.filter((item) => item.storage === 'remote' && item.sha256).map((item) => item.sha256));
   return {
     schemaVersion: CLOUD_SYNC_SCHEMA_VERSION,
     snapshot_id: snapshotId,
@@ -7579,6 +7675,7 @@ function cloudSync_buildManifest({ snapshotId, mapsList, stateChunks, bundleJson
     scene_count: scenes.length,
     map_count: mapsList.length,
     map_placeholder_count: mapsList.filter((item) => item.storage === 'placeholder').length,
+    map_manual_remote_count: mapsList.filter((item) => item.storage === 'manualRemote').length,
     token_count: tokenCount,
     annotation_count: annotationCount,
     event_count: eventCount,
@@ -7596,25 +7693,29 @@ function cloudSync_buildManifest({ snapshotId, mapsList, stateChunks, bundleJson
     state_chunk_size_bytes: CLOUD_SYNC_SINGLE_LIMIT,
     maps: mapsList.map((item) => {
       const isPlaceholder = item.storage === 'placeholder';
+      const isManualRemote = item.storage === 'manualRemote';
+      const manualSource = isManualRemote ? item.mapSource || {} : {};
       return {
         scene_id: item.sceneId,
         scene_name: item.sceneName,
-        storage: isPlaceholder ? 'placeholder' : 'remote',
+        storage: isPlaceholder ? 'placeholder' : (isManualRemote ? 'manualRemote' : 'remote'),
+        map_source_type: isManualRemote ? 'manualRemote' : null,
         placeholder: isPlaceholder,
         requires_local_file: isPlaceholder,
         reason: isPlaceholder ? (item.reason || item.mapSource?.reason || 'large-map-skipped') : null,
-        map_sha256: isPlaceholder ? null : item.sha256,
-        map_path: isPlaceholder ? null : `${cloudSync_mapBasePath(item.sha256)}/`,
+        map_sha256: isPlaceholder ? null : (isManualRemote ? (manualSource.sha || item.sha256 || null) : item.sha256),
+        map_path: isPlaceholder ? null : (isManualRemote ? manualSource.path : `${cloudSync_mapBasePath(item.sha256)}/`),
+        manual_name: isManualRemote ? (manualSource.name || item.sceneName || '') : null,
         map_fingerprint: item.mapFingerprint || null,
         mime: item.mime,
         original_bytes: item.originalByteSize || item.byteSize || 0,
-        stored_bytes: isPlaceholder ? 0 : item.byteSize,
-        optimized: !isPlaceholder && !!item.optimized,
+        stored_bytes: isPlaceholder || isManualRemote ? 0 : item.byteSize,
+        optimized: !isPlaceholder && !isManualRemote && !!item.optimized,
         downsampled_w: item.mapSize?.w || null,
         downsampled_h: item.mapSize?.h || null,
-        map_chunk_count: isPlaceholder ? 0 : (item.chunkCount || 1),
+        map_chunk_count: isPlaceholder || isManualRemote ? 0 : (item.chunkCount || 1),
         created_at: new Date().toISOString(),
-        status: item.status || (isPlaceholder ? 'skipped' : 'pending'),
+        status: item.status || (isPlaceholder ? 'skipped' : (isManualRemote ? 'referenced' : 'pending')),
       };
     }),
     maps_total_bytes: Array.from(uniqueSha).reduce((sum, sha) => {
@@ -7634,7 +7735,7 @@ function cloudSync_parseManifest(json) {
   }
   json.maps = json.maps.map((item) => ({
     ...item,
-    storage: cloudSync_isPlaceholderMapEntry(item) ? 'placeholder' : 'remote',
+    storage: cloudSync_isPlaceholderMapEntry(item) ? 'placeholder' : (cloudSync_isManualRemoteMapEntry(item) ? 'manualRemote' : 'remote'),
   }));
   return json;
 }
@@ -7808,7 +7909,7 @@ function cloudSync_mergeMapStatus(manifest, sha256, status) {
 function cloudSync_buildUniqueMapPlan(mapsList) {
   const bySha = new Map();
   for (const item of mapsList) {
-    if (item.storage === 'placeholder' || !item.sha256) continue;
+    if (item.storage === 'placeholder' || item.storage === 'manualRemote' || !item.sha256) continue;
     let plan = bySha.get(item.sha256);
     if (!plan) {
       plan = {
@@ -7835,7 +7936,7 @@ async function cloudSync_prepareUploadPlan({ snapshotId, note }) {
   const mapsList = await cloudSync_collectMapBlobs();
   const mapSourcesBySceneId = new Map();
   for (const item of mapsList) {
-    if (item.storage === 'placeholder' && item.mapSource) {
+    if ((item.storage === 'placeholder' || item.storage === 'manualRemote') && item.mapSource) {
       mapSourcesBySceneId.set(item.sceneId, item.mapSource);
     }
   }
@@ -7923,8 +8024,10 @@ async function cloudSync_uploadPrepared({ owner, repo, token, snapshotId, note, 
   cloudSync_clearPendingBanner();
   hideLoading();
   const skipped = mapsList.filter((item) => item.storage === 'placeholder').length;
+  const manualRefs = mapsList.filter((item) => item.storage === 'manualRemote').length;
   const skippedText = skipped ? `，${skipped} 张大地图仅保存占位` : '';
-  showToast(`上传完成 ✓ 复用 ${reused} 张已有地图,新上传 ${uploaded} 张${skippedText}`, 5200);
+  const manualText = manualRefs ? `，${manualRefs} 张引用云端地图库` : '';
+  showToast(`上传完成 ✓ 复用 ${reused} 张已有地图,新上传 ${uploaded} 张${skippedText}${manualText}`, 5200);
   return { ok: true, reused, uploaded, manifest, bundleJson, mapsList };
 }
 function cloudSync_showConflictDialog(remoteLatest, onOverwrite, onDownloadRemote) {
@@ -8075,6 +8178,15 @@ async function cloudSync_downloadStateBundleFromManifest({ owner, repo, token, m
   return JSON.parse(cloudSync_bytesToString(bundleBytes));
 }
 async function cloudSync_downloadMapBlob({ owner, repo, token, mapMeta }) {
+  if (cloudSync_isManualRemoteMapEntry(mapMeta)) {
+    return await cloudSync_getRawBlobFile({
+      owner,
+      repo,
+      token,
+      path: mapMeta.map_path,
+      mime: mapMeta.mime || cloudSync_guessMimeFromPath(mapMeta.map_path),
+    });
+  }
   let blob = await cloudSync_readCachedMap(mapMeta.map_sha256);
   if (blob) return blob;
   let chunkCount = mapMeta.map_chunk_count || 1;
@@ -8153,7 +8265,7 @@ async function cloudSync_restoreSnapshot({ owner, repo, token, snapshotId }) {
     state.cloudSync.lastError = null;
     hideLoading();
     const placeholderCount = mapSourceBySceneId.size;
-    showToast(placeholderCount ? `已读取云端进度 ✓ ${placeholderCount} 张大地图需绑定本机原图` : '已读取云端进度 ✓', 5200);
+    showToast(placeholderCount ? `已读取云端进度 ✓ ${placeholderCount} 张大地图需绑定本机或云端地图` : '已读取云端进度 ✓', 5200);
     return true;
   } catch (err) {
     hideLoading();
@@ -8365,6 +8477,7 @@ function showCloudSyncStatusView() {
     </div>
     <div class="modal-actions">
       <button id="cloud-sync-history">📜 历史进度</button>
+      ${isEditSurface() ? '<button id="cloud-sync-manual-maps">🗺 云端地图库</button>' : ''}
       ${isEditSurface() && !state.cloudSync.tokenIsReadonly ? '<button id="cloud-sync-gc">🧹 清理云端孤儿</button>' : ''}
       ${isEditSurface() ? '<button id="cloud-sync-forget" class="danger">忘记这台电脑</button>' : ''}
       <button id="cloud-sync-token-page">打开 GitHub 钥匙页面</button>
@@ -8380,10 +8493,112 @@ function showCloudSyncStatusView() {
       if (uploadBtn) uploadBtn.addEventListener('click', showCloudSyncUploadForm);
       $('cloud-sync-download').addEventListener('click', onClickDownloadLatest);
       $('cloud-sync-history').addEventListener('click', showCloudSyncHistoryModal);
+      const manualMapsBtn = $('cloud-sync-manual-maps');
+      if (manualMapsBtn) manualMapsBtn.addEventListener('click', showCloudSyncManualMapLibraryModal);
       const gcBtn = $('cloud-sync-gc');
       if (gcBtn) gcBtn.addEventListener('click', onClickCloudSyncGc);
     }
   });
+}
+async function cloudSync_bindManualRemoteMapToScene(sceneId, manualMap) {
+  const scene = state.scenes[sceneId];
+  if (!scene) { showToast('场景不存在'); return false; }
+  if (!sceneNeedsLocalMap(scene)) {
+    showToast('当前场景不是待绑定占位地图');
+    return false;
+  }
+  const token = cloudSync_getToken();
+  if (!token) { showToast('请先连接云存档'); return false; }
+  try {
+    setLoading(`下载云端地图：${manualMap.name || manualMap.path}`);
+    const blob = await cloudSync_getRawBlobFile({
+      owner: state.cloudSync.repoOwner,
+      repo: state.cloudSync.repoName,
+      token,
+      path: manualMap.path,
+      mime: manualMap.mime || cloudSync_guessMimeFromPath(manualMap.path),
+    });
+    const preparedMap = await prepareMapFromBlob(blob, { showDownsampleToast: true });
+    const w = preparedMap.w;
+    const h = preparedMap.h;
+    const expected = scene.mapSize;
+    if (!expected || expected.w !== w || expected.h !== h) {
+      hideLoading();
+      showToast(`地图尺寸不一致：需要 ${expected?.w || '?'}×${expected?.h || '?'}，云端是 ${w}×${h}`, 6200);
+      return false;
+    }
+    const nextFingerprint = `manual:${manualMap.path}-${manualMap.sha || manualMap.size || 0}-${w}x${h}`;
+    const mapSource = cloudSync_buildManualRemoteMapSource(manualMap, {
+      mapSize: { w, h },
+      mapFingerprint: nextFingerprint,
+    });
+    await restoreSceneWithPreparedMap(sceneId, blob, preparedMap, nextFingerprint, w, h, { mapSource });
+    hideLoading();
+    showToast('已绑定云端地图库地图 ✓', 3600);
+    return true;
+  } catch (err) {
+    hideLoading();
+    console.error('cloudSync bind manual map failed:', err);
+    showToast('绑定云端地图失败：' + (err.userMessage || err.message || err), 5200);
+    return false;
+  }
+}
+async function showCloudSyncManualMapLibraryModal() {
+  if (!isEditSurface()) { showToast('请先进入编辑态'); return; }
+  const token = cloudSync_getToken();
+  if (!token) { showToast('请先连接云存档'); return; }
+  setLoading('正在读取云端地图库...');
+  try {
+    const maps = await cloudSync_listManualMaps({
+      owner: state.cloudSync.repoOwner,
+      repo: state.cloudSync.repoName,
+      token,
+    });
+    hideLoading();
+    const currentScene = state.currentSceneId ? state.scenes[state.currentSceneId] : null;
+    const canBind = sceneNeedsLocalMap(currentScene);
+    const desc = canBind
+      ? `当前占位场景需要 ${currentScene.mapSize.w}×${currentScene.mapSize.h} 的地图。请选择云端地图库里的同尺寸图片。`
+      : '当前场景不是待绑定占位地图。你仍可查看云端地图库，但暂时不能绑定。';
+    const rows = maps.map((item, idx) => `
+      <div class="scene-row">
+        <div style="flex:1;min-width:0;">
+          <div class="scene-name">${escapeHtml(item.name)}</div>
+          <div class="scene-meta">${escapeHtml(item.path)} · ${cloudSync_formatBytes(item.size || 0)}</div>
+        </div>
+        <div class="scene-actions">
+          <button class="manual-map-bind" data-index="${idx}" ${canBind ? '' : 'disabled'}>绑定</button>
+        </div>
+      </div>
+    `).join('') || '<div class="modal-desc">`manual-maps/` 目录里还没有图片。</div>';
+    showModal(`
+      <div class="modal-title">🗺 云端地图库</div>
+      <div class="modal-desc">${escapeHtml(desc)}</div>
+      <div class="scene-list">${rows}</div>
+      <div class="modal-actions">
+        <button id="cloud-manual-back">返回云存档</button>
+        <button id="cloud-manual-close">关闭</button>
+      </div>
+    `, {
+      onMounted: () => {
+        $('cloud-manual-back').onclick = showCloudSyncStatusView;
+        $('cloud-manual-close').onclick = closeModal;
+        document.querySelectorAll('.manual-map-bind').forEach((btn) => {
+          btn.onclick = async () => {
+            const map = maps[parseInt(btn.dataset.index, 10)];
+            if (!map || !state.currentSceneId) return;
+            closeModal();
+            await cloudSync_bindManualRemoteMapToScene(state.currentSceneId, map);
+          };
+        });
+      }
+    });
+  } catch (err) {
+    hideLoading();
+    const errorObject = err && err.userMessage ? err : await cloudSync_classifyError(null, err);
+    console.error('cloudSync manual map list failed:', errorObject);
+    showToast(errorObject.userMessage || '读取云端地图库失败', 4200);
+  }
 }
 async function showCloudSyncHistoryModal() {
   setLoading('正在读取历史列表...');
@@ -8461,7 +8676,7 @@ async function showCloudSyncHistoryModal() {
 function showCloudSyncUploadForm() {
   showModal(`
     <div class="modal-title">📤 上传当前进度</div>
-    <div class="modal-desc">把当前全部场景、迷雾、Token、事件、标注和地图原图上传到你的私有仓库。超大地图和大状态会自动切包。</div>
+    <div class="modal-desc">把当前全部场景、迷雾、Token、事件、标注和地图上传到你的私有仓库。普通图自动上传；已绑定云端地图库的图只保存引用；真正超大的图保存占位。</div>
     <div class="form-row">
       <label for="cloud-sync-note-input">备注</label>
       <textarea id="cloud-sync-note-input" rows="3" placeholder="比如：阶段 2 首次上传测试"></textarea>
@@ -9677,7 +9892,7 @@ async function tryAutoLoadCurrentScene() {
     await loadCheckpoints();
     fitView();
     setupBrushSizeFromState();
-    const suffix = sceneNeedsLocalMap(scene) ? '（占位地图，需绑定本机原图）' : '';
+    const suffix = sceneNeedsLocalMap(scene) ? '（占位地图，需绑定地图）' : '';
     showToast('已恢复场景 "' + (scene.name || '场景') + '"' + suffix, 3600);
   } catch (e) {
     console.error(e);
