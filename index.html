@@ -480,18 +480,38 @@ button.icon { padding: 6px 10px; }
 }
 .entry-new-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 54px auto;
   gap: 8px;
 }
 .entry-manager-row {
   display: grid;
-  grid-template-columns: 34px 1.2fr 90px 92px 72px;
+  grid-template-columns: 34px 1.2fr 64px 90px 92px 72px;
   gap: 8px;
   align-items: center;
   border: 1px solid var(--theme-border);
   background: var(--theme-bg-input);
   border-radius: var(--theme-radius-sm);
   padding: 8px;
+}
+.entry-hotkey-input {
+  text-transform: uppercase;
+  text-align: center;
+  font-weight: 700;
+}
+.entry-hotkey-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--theme-warn) 58%, transparent);
+  border-radius: var(--theme-radius-sm);
+  background: color-mix(in srgb, var(--theme-warn) 18%, var(--theme-bg-input));
+  color: var(--theme-text);
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 .entry-color-dot {
   width: 22px;
@@ -2292,6 +2312,36 @@ function entryNameKey(name) {
   return normalizeEntryName(name).toLowerCase();
 }
 
+function normalizeEntryHotkey(value) {
+  const text = String(value || '').trim().toUpperCase();
+  return /^[A-Z]$/.test(text) ? text : '';
+}
+
+function getEntryByHotkey(value) {
+  const key = normalizeEntryHotkey(value);
+  if (!key) return null;
+  return (state.entries || []).find((entry) => entry.hotkey === key) || null;
+}
+
+function entryHotkeyInUse(hotkey, exceptId = null) {
+  const key = normalizeEntryHotkey(hotkey);
+  if (!key) return null;
+  return (state.entries || []).find((entry) => entry.hotkey === key && entry.id !== exceptId) || null;
+}
+
+function entryDisplayName(entry, opts = {}) {
+  if (!entry) return '';
+  if (opts.withHotkey === false || !entry.hotkey) return entry.name;
+  return `${entry.hotkey} ${entry.name}`;
+}
+
+function bindEntryHotkeyInput(input) {
+  if (!input) return;
+  input.addEventListener('input', () => {
+    input.value = normalizeEntryHotkey(input.value);
+  });
+}
+
 function normalizeEntryIdsForEntries(value, entries) {
   const source = Array.isArray(value) ? value : (value ? [value] : []);
   const known = new Set((entries || []).map((e) => e.id));
@@ -2327,6 +2377,7 @@ function normalizeEntries(entries) {
   const out = [];
   const seenNames = new Set();
   const seenIds = new Set();
+  const seenHotkeys = new Set();
   for (const raw of (Array.isArray(entries) ? entries : [])) {
     const name = normalizeEntryName(raw?.name);
     const key = entryNameKey(name);
@@ -2335,9 +2386,13 @@ function normalizeEntries(entries) {
     if (!id || seenIds.has(id)) id = uuid();
     seenNames.add(key);
     seenIds.add(id);
+    let hotkey = normalizeEntryHotkey(raw?.hotkey);
+    if (hotkey && seenHotkeys.has(hotkey)) hotkey = '';
+    if (hotkey) seenHotkeys.add(hotkey);
     out.push({
       id,
       name,
+      hotkey,
       color: normalizeHex(raw?.color || ENTRY_COLORS[out.length % ENTRY_COLORS.length]),
       livePicker: raw?.livePicker !== false,
       sortOrder: Number.isFinite(raw?.sortOrder) ? raw.sortOrder : out.length,
@@ -2395,9 +2450,16 @@ function createEntry(name, opts = {}) {
   const key = entryNameKey(cleanName);
   const existing = (state.entries || []).find((entry) => entryNameKey(entry.name) === key);
   if (existing) return existing;
+  const hotkey = normalizeEntryHotkey(opts.hotkey);
+  const hotkeyOwner = hotkey ? entryHotkeyInUse(hotkey) : null;
+  if (hotkeyOwner) {
+    showToast(`${hotkey} 已经绑定给「${hotkeyOwner.name}」`);
+    return null;
+  }
   const entry = {
     id: uuid(),
     name: cleanName,
+    hotkey,
     color: normalizeHex(opts.color || ENTRY_COLORS[(state.entries || []).length % ENTRY_COLORS.length]),
     livePicker: opts.livePicker !== false,
     sortOrder: state.entries.length,
@@ -2426,6 +2488,7 @@ function setActiveEntry(entryId) {
   const next = getEntryById(entryId) ? entryId : null;
   state.activeEntryId = next;
   updateEntryButton();
+  updateObjectPanel();
   scheduleRender('all');
 }
 
@@ -2436,7 +2499,7 @@ function updateEntryButton() {
   btn.classList.toggle('active', !!entry);
   btn.style.setProperty('--entry-color', entry ? entry.color : '');
   const label = btn.querySelector('.label-only');
-  if (label) label.textContent = entry ? `词条: ${entry.name}` : '词条';
+  if (label) label.textContent = entry ? `词条: ${entryDisplayName(entry)}` : '词条';
 }
 
 function entryChipsHTML(entryIds) {
@@ -2445,14 +2508,14 @@ function entryChipsHTML(entryIds) {
     const entry = getEntryById(id);
     if (!entry) return '';
     const active = state.activeEntryId === id ? ' active' : '';
-    return `<span class="object-tag-chip${active}" style="border-color:${escapeHtml(entry.color)}">${escapeHtml(entry.name)}</span>`;
+    return `<span class="object-tag-chip${active}" style="border-color:${escapeHtml(entry.color)}">${escapeHtml(entryDisplayName(entry))}</span>`;
   }).join('');
 }
 
 function entryAssignmentHTML(selectedIds) {
   const ids = new Set(normalizeEntryIds(selectedIds));
   const chips = (state.entries || []).map((entry) => `
-    <button type="button" class="entry-pick${ids.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}">${escapeHtml(entry.name)}</button>
+    <button type="button" class="entry-pick${ids.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}">${escapeHtml(entryDisplayName(entry))}</button>
   `).join('');
   return `
     <div class="form-row">
@@ -2461,6 +2524,7 @@ function entryAssignmentHTML(selectedIds) {
         <div class="entry-picker-chips" id="entry-picker-chips">${chips || '<span class="object-empty" style="padding:4px 0;text-align:left;">暂无词条</span>'}</div>
         <div class="entry-new-row">
           <input id="entry-new-name" type="text" maxlength="40" placeholder="新建词条">
+          <input id="entry-new-hotkey" class="entry-hotkey-input" type="text" maxlength="1" placeholder="键">
           <button id="entry-new-add" type="button">新建</button>
         </div>
       </div>
@@ -2474,7 +2538,7 @@ function mountEntryAssignmentControl(initialIds) {
     const box = $('entry-picker-chips');
     if (!box) return;
     box.innerHTML = (state.entries || []).map((entry) => `
-      <button type="button" class="entry-pick${selected.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}">${escapeHtml(entry.name)}</button>
+      <button type="button" class="entry-pick${selected.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}">${escapeHtml(entryDisplayName(entry))}</button>
     `).join('') || '<span class="object-empty" style="padding:4px 0;text-align:left;">暂无词条</span>';
     box.querySelectorAll('.entry-pick').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -2488,18 +2552,26 @@ function mountEntryAssignmentControl(initialIds) {
   render();
   const addBtn = $('entry-new-add');
   const input = $('entry-new-name');
+  const hotkeyInput = $('entry-new-hotkey');
+  bindEntryHotkeyInput(hotkeyInput);
   if (addBtn && input) {
     const add = () => {
-      const entry = createEntry(input.value);
+      const entry = createEntry(input.value, { hotkey: hotkeyInput?.value });
       if (!entry) return;
       selected.add(entry.id);
       input.value = '';
+      if (hotkeyInput) hotkeyInput.value = '';
       render();
     };
     addBtn.addEventListener('click', add);
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); add(); }
     });
+    if (hotkeyInput) {
+      hotkeyInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); add(); }
+      });
+    }
   }
   return () => normalizeEntryIds(Array.from(selected));
 }
@@ -6348,6 +6420,20 @@ function onWheel(e) {
 }
 
 // ============== 键盘 ==============
+function handleEntryHotkeyDown(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return false;
+  const key = normalizeEntryHotkey(e.key);
+  if (!key || !state.hasMap) return false;
+  pruneEntryReferences();
+  const entry = getEntryByHotkey(key);
+  if (!entry) return false;
+  if (!isEditSurface() && entry.livePicker === false) return false;
+  setActiveEntry(state.activeEntryId === entry.id ? null : entry.id);
+  showToast(state.activeEntryId ? `词条聚光：${entryDisplayName(entry)}` : `已关闭词条：${entry.name}`, 1200);
+  e.preventDefault();
+  return true;
+}
+
 function onKeyDown(e) {
   if (state.gridCalibration && e.key === 'Escape') {
     finishGridCalibration(false);
@@ -6376,6 +6462,8 @@ function onKeyDown(e) {
     openThemePrompt();
     return;
   }
+
+  if (handleEntryHotkeyDown(e)) return;
 
   // Space 平移（按住）
   if (e.code === 'Space') {
@@ -6950,12 +7038,12 @@ function hideLoading() {
   }
 }
 
-// ============== 云存档（v3.16.0） ==============
+// ============== 云存档（v3.17.0） ==============
 const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.16.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.17.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -9393,6 +9481,7 @@ function openEntrySpotlightModal() {
       <button class="info-tag-row${active ? ' active' : ''}" data-entry-id="${escapeHtml(entry.id)}">
         <span style="display:flex;align-items:center;gap:8px;min-width:0;">
           <span class="entry-color-dot" style="background:${escapeHtml(entry.color)}"></span>
+          ${entry.hotkey ? `<span class="entry-hotkey-badge">${escapeHtml(entry.hotkey)}</span>` : ''}
           <span class="info-tag-name">${escapeHtml(entry.name)}</span>
         </span>
         <span class="info-tag-count">${canManage ? `${row.total} 项` : (active ? '已显露' : '选择')}</span>
@@ -9437,6 +9526,7 @@ function openEntryManagerModal() {
       <div class="entry-manager-row" data-entry-id="${escapeHtml(entry.id)}">
         <span class="entry-color-dot" style="background:${escapeHtml(entry.color)}"></span>
         <input class="entry-manager-name" type="text" maxlength="40" value="${escapeHtml(entry.name)}">
+        <input class="entry-manager-hotkey entry-hotkey-input" type="text" maxlength="1" value="${escapeHtml(entry.hotkey || '')}" placeholder="键">
         <input class="entry-manager-color" type="text" maxlength="7" value="${escapeHtml(entry.color)}">
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input class="entry-manager-live" type="checkbox"${entry.livePicker !== false ? ' checked' : ''}> 跑团</label>
         <button class="entry-manager-delete danger" type="button" ${row.total ? '' : ''}>删除</button>
@@ -9451,6 +9541,7 @@ function openEntryManagerModal() {
       <label>新建词条</label>
       <div class="entry-new-row">
         <input id="entry-manager-new-name" type="text" maxlength="40" placeholder="词条名">
+        <input id="entry-manager-new-hotkey" class="entry-hotkey-input" type="text" maxlength="1" placeholder="键">
         <button id="entry-manager-new-add" type="button">新建</button>
       </div>
     </div>
@@ -9460,9 +9551,20 @@ function openEntryManagerModal() {
     </div>
   `, {
     onMounted: () => {
-      $('entry-manager-new-add').addEventListener('click', () => {
-        const entry = createEntry($('entry-manager-new-name').value);
+      bindEntryHotkeyInput($('entry-manager-new-hotkey'));
+      document.querySelectorAll('.entry-manager-hotkey').forEach(bindEntryHotkeyInput);
+      const addNewEntry = () => {
+        const entry = createEntry($('entry-manager-new-name').value, { hotkey: $('entry-manager-new-hotkey')?.value });
         if (entry) { closeModal(); openEntryManagerModal(); }
+      };
+      $('entry-manager-new-add').addEventListener('click', () => {
+        addNewEntry();
+      });
+      $('entry-manager-new-name').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addNewEntry(); }
+      });
+      $('entry-manager-new-hotkey').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addNewEntry(); }
       });
       $('entry-manager-close').addEventListener('click', closeModal);
       document.querySelectorAll('.entry-manager-delete').forEach((btn) => {
@@ -9487,7 +9589,10 @@ function openEntryManagerModal() {
       });
       $('entry-manager-save').addEventListener('click', () => {
         const seen = new Set();
+        const seenHotkeys = new Set();
+        const drafts = [];
         let ok = true;
+        let hotkeyError = '';
         document.querySelectorAll('.entry-manager-row').forEach((row, idx) => {
           const id = row.dataset.entryId;
           const entry = getEntryById(id);
@@ -9496,13 +9601,31 @@ function openEntryManagerModal() {
           const key = entryNameKey(name);
           if (!name || seen.has(key)) { ok = false; return; }
           seen.add(key);
-          entry.name = name;
-          entry.color = normalizeHex(row.querySelector('.entry-manager-color')?.value || entry.color);
-          entry.livePicker = !!row.querySelector('.entry-manager-live')?.checked;
-          entry.sortOrder = idx;
-          entry.updatedAt = Date.now();
+          const hotkey = normalizeEntryHotkey(row.querySelector('.entry-manager-hotkey')?.value);
+          if (hotkey && seenHotkeys.has(hotkey)) {
+            ok = false;
+            hotkeyError = `${hotkey} 已经绑定给别的词条`;
+            return;
+          }
+          if (hotkey) seenHotkeys.add(hotkey);
+          drafts.push({
+            entry,
+            name,
+            hotkey,
+            color: normalizeHex(row.querySelector('.entry-manager-color')?.value || entry.color),
+            livePicker: !!row.querySelector('.entry-manager-live')?.checked,
+            sortOrder: idx,
+          });
         });
-        if (!ok) { showToast('词条名不能为空，也不能重名'); return; }
+        if (!ok) { showToast(hotkeyError || '词条名不能为空，也不能重名'); return; }
+        drafts.forEach((draft) => {
+          draft.entry.name = draft.name;
+          draft.entry.hotkey = draft.hotkey;
+          draft.entry.color = draft.color;
+          draft.entry.livePicker = draft.livePicker;
+          draft.entry.sortOrder = draft.sortOrder;
+          draft.entry.updatedAt = Date.now();
+        });
         state.entries = normalizeEntries(state.entries);
         updateEntryButton();
         updateObjectPanel();
