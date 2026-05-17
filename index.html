@@ -1838,6 +1838,7 @@ const LONG_PRESS_MS = 600;
 const LONG_PRESS_TOLERANCE = 8;
 const EVENT_DEFAULT_SIZE = 32;
 const EVENT_DRAG_THRESHOLD = 5;
+const SAFE_SELECT_CLICK_TOLERANCE = 6;
 const DBL_CLICK_MS = 500;
 const ANNOTATION_DEFAULT_TEXT_SIZE = 32;
 const ANNOTATION_DEFAULT_IMAGE_WIDTH = 180;
@@ -4512,6 +4513,7 @@ function drawSelectedEventHighlight() {
 
 function drawBrushPreview() {
   if (state.gridCalibration) return;
+  if (state.spaceHeld) { drawSafeSelectPreview(); return; }
   if (!state.showBrushPreview || !state.hasMap) return;
   if (state.uiMode !== 'normal') return;
   if (state.cursorScreenX < 0) return;
@@ -4566,6 +4568,34 @@ function drawBrushPreview() {
   ctx.strokeStyle = state.theme.brushLabelOutline;
   ctx.strokeText(text, labelX, labelY);
   ctx.fillText(text, labelX, labelY);
+  ctx.restore();
+}
+
+function drawSafeSelectPreview() {
+  if (!state.hasMap || state.uiMode !== 'normal') return;
+  if (state.cursorScreenX < 0) return;
+  const ctx = state.mainCtx;
+  const dpr = state._dpr || 1;
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const x = state.cursorScreenX;
+  const y = state.cursorScreenY;
+  ctx.strokeStyle = state.theme.warn;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.68)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  ctx.arc(x, y, 13, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillRect(x + 18, y - 15, 128, 30);
+  ctx.strokeStyle = state.theme.warn;
+  ctx.strokeRect(x + 18, y - 15, 128, 30);
+  ctx.font = '600 12px ' + state.theme.fontFamily;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = state.theme.text || '#fff';
+  ctx.fillText('安全选择 · 不擦雾', x + 26, y);
   ctx.restore();
 }
 
@@ -5887,6 +5917,7 @@ function onPointerDown(e) {
   const info = {
     id: e.pointerId, type: e.pointerType,
     startX: sx, startY: sy, lastX: sx, lastY: sy,
+    button: e.button,
     role: undefined,
   };
   state.pointers.set(e.pointerId, info);
@@ -5915,6 +5946,8 @@ function onPointerDown(e) {
   if ((e.pointerType === 'mouse' && e.button === 1) ||
       (e.pointerType === 'mouse' && e.button === 0 && state.spaceHeld)) {
     info.role = 'pan';
+    info.safeSelect = (e.pointerType === 'mouse' && e.button === 0 && state.spaceHeld);
+    info.panStarted = !info.safeSelect;
     state.panAnchor = { x: state.view.x, y: state.view.y, sx: info.startX, sy: info.startY };
     return;
   }
@@ -5999,6 +6032,30 @@ function onPointerDown(e) {
   paintBrushAt(sx, sy);
 }
 
+function safeSelectAt(sx, sy, pointerType = 'mouse') {
+  if (!state.hasMap) return;
+  const hitEvent = findTopEventAt(sx, sy, pointerType);
+  if (hitEvent) {
+    setSelectedObject('event', hitEvent.id, { render: false, keepEventCard: true });
+    showEventCard(hitEvent.id);
+    scheduleRender('all');
+    return;
+  }
+  const [mx, my] = screenToMap(sx, sy);
+  const hitToken = findTopTokenAt(mx, my);
+  if (hitToken) {
+    setSelectedObject('token', hitToken.id);
+    return;
+  }
+  const hitAnnotation = findTopAnnotationAt(mx, my);
+  if (hitAnnotation) {
+    setSelectedObject('annotation', hitAnnotation.id);
+    return;
+  }
+  clearSelection();
+  hideEventCard();
+}
+
 function insideMap(mx, my) {
   return mx >= 0 && my >= 0 && mx < state.mapCanvas.width && my < state.mapCanvas.height;
 }
@@ -6045,7 +6102,7 @@ function onPointerMove(e) {
   state.cursorScreenX = x;
   state.cursorScreenY = y;
   if (e.pointerType === 'mouse') {
-    state.showBrushPreview = state.hasMap && (state.brush.mode === 'reveal' || state.brush.mode === 'cover' || state.brush.mode === 'reveal-all');
+    state.showBrushPreview = state.hasMap && !state.spaceHeld && (state.brush.mode === 'reveal' || state.brush.mode === 'cover' || state.brush.mode === 'reveal-all');
     scheduleRender('all');
   }
   // 长按位移取消
@@ -6107,6 +6164,16 @@ function onPointerMove(e) {
       }
     }
   } else if (info.role === 'pan') {
+    const moved = dist(info.startX, info.startY, x, y);
+    if (info.safeSelect && !info.panStarted) {
+      if (moved <= SAFE_SELECT_CLICK_TOLERANCE) {
+        info.lastX = x; info.lastY = y;
+        scheduleRender('all');
+        return;
+      }
+      info.panStarted = true;
+      hideEventCard();
+    }
     const dx = x - info.startX;
     const dy = y - info.startY;
     state.view.x = state.panAnchor.x + dx;
@@ -6138,6 +6205,8 @@ function onPointerUp(e) {
     const ev = state.events.find((e) => e.id === info.eventId);
     if (ev) pushUndo({ type: 'event-move', id: ev.id, prevX: info.eventStartX, prevY: info.eventStartY });
     triggerImmediateSave();
+  } else if (info.role === 'pan' && info.safeSelect && !info.panStarted) {
+    safeSelectAt(info.lastX, info.lastY, info.type);
   } else if (info.role === 'token-select' || info.role === 'annotation-select') {
     // 跑团态只选中查看，不移动或保存对象。
   } else if (info.role === 'event-interact') {
@@ -6295,6 +6364,10 @@ function onKeyDown(e) {
     e.preventDefault();
     return;
   }
+  if (state.uiMode === 'modal') {
+    if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
+    return;
+  }
 
   // Ctrl+Shift+T 主题输入（开发者快捷键）
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 't' || e.key === 'T')) {
@@ -6308,6 +6381,9 @@ function onKeyDown(e) {
     if (!state.spaceHeld) {
       state.spaceHeld = true;
       document.body.style.cursor = 'grab';
+      state.showBrushPreview = false;
+      updateModeStatus();
+      scheduleRender('all');
     }
     e.preventDefault();
     return;
@@ -6335,12 +6411,6 @@ function onKeyDown(e) {
       e.preventDefault();
       return;
     }
-  }
-
-  // modal 中只处理 ESC 关闭
-  if (state.uiMode === 'modal') {
-    if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
-    return;
   }
 
   if (e.key === 'Escape') {
@@ -6379,6 +6449,8 @@ function onKeyUp(e) {
   if (e.code === 'Space') {
     state.spaceHeld = false;
     document.body.style.cursor = '';
+    updateModeStatus();
+    scheduleRender('all');
   }
 }
 
@@ -6406,6 +6478,10 @@ function setBrushMode(mode) {
 }
 
 function updateModeStatus() {
+  if (state.spaceHeld) {
+    $('status-mode').textContent = '安全选择';
+    return;
+  }
   const layer = state.brush.mode === 'reveal-all'
     ? '双层'
     : (state.currentLayer === 'terrain' ? '地形' : '事件');
