@@ -7438,7 +7438,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.20.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.20.1';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -10228,13 +10228,13 @@ function openRevealZonesModal() {
         btn.onclick = () => { revealZoneById(btn.dataset.zoneId); closeModal(); };
       });
       document.querySelectorAll('.reveal-zone-edit').forEach((btn) => {
-        btn.onclick = () => openRevealZoneEditor(btn.dataset.zoneId);
+        btn.onclick = () => { closeModal(); openRevealZoneEditor(btn.dataset.zoneId); };
       });
       document.querySelectorAll('.reveal-zone-delete').forEach((btn) => {
         btn.onclick = () => deleteRevealZone(btn.dataset.zoneId);
       });
       const newBtn = $('reveal-zone-new');
-      if (newBtn) newBtn.onclick = () => openRevealZoneEditor();
+      if (newBtn) newBtn.onclick = () => { closeModal(); openRevealZoneEditor(); };
       $('reveal-zone-close').onclick = closeModal;
     }
   });
