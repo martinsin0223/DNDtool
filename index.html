@@ -1911,6 +1911,9 @@ const CHECKPOINT_LIMIT = 5;
 const CHECKPOINT_STROKE_THRESHOLD = 50;
 const CHECKPOINT_TIME_THRESHOLD = 120000;
 const BRUSH_MIN = 20, BRUSH_MAX = 300, BRUSH_DEFAULT = 60;
+const TOKEN_EXPLORE_RADIUS_MIN = 20;
+const TOKEN_EXPLORE_RADIUS_MAX = 600;
+const TOKEN_EXPLORE_RADIUS_DEFAULT = 120;
 const SCALE_MIN = 0.1, SCALE_MAX = 10;
 const SCHEMA_VERSION = 3;
 const DB_NAME = 'fog-of-war-map';
@@ -3387,6 +3390,8 @@ async function serializeActiveSceneData() {
     borderPattern: t.borderPattern, name: t.name,
     x: t.x, y: t.y, size: t.size, zOrder: t.zOrder,
     entryIds: objectEntryIds(t),
+    explorerEnabled: !!t.explorerEnabled,
+    exploreRadius: normalizeTokenExploreRadius(t.exploreRadius),
   }));
   const eventsSerialized = state.events.map((ev) => ({
     id: ev.id, x: ev.x, y: ev.y,
@@ -3546,6 +3551,8 @@ async function serializeSceneForBundle(sceneId, scene, opts = {}) {
     shape: t.shape, borderColor: t.borderColor, borderPattern: t.borderPattern,
     name: t.name, x: t.x, y: t.y, size: t.size, zOrder: t.zOrder,
     entryIds: normalizeEntryIdsForEntries(t.entryIds || [], sceneEntries),
+    explorerEnabled: !!t.explorerEnabled,
+    exploreRadius: normalizeTokenExploreRadius(t.exploreRadius),
   })));
   const eventsExported = await Promise.all((scene.events || []).map(async (ev) => {
     const icon = ev.icon || { type: 'emoji', value: '❓' };
@@ -4933,6 +4940,47 @@ function paintCircleOnFogLayer(layerKey, mx, my, rMap, mode) {
   ctx.restore();
 }
 
+function normalizeTokenExploreRadius(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return TOKEN_EXPLORE_RADIUS_DEFAULT;
+  return clamp(n, TOKEN_EXPLORE_RADIUS_MIN, TOKEN_EXPLORE_RADIUS_MAX);
+}
+
+function paintTokenExploreFog(token) {
+  if (!token || !token.explorerEnabled || !state.hasMap) return false;
+  const radius = normalizeTokenExploreRadius(token.exploreRadius);
+  const mx = clamp(token.x, 0, state.mapCanvas.width);
+  const my = clamp(token.y, 0, state.mapCanvas.height);
+  const layerKeys = ['terrain', 'event'];
+  const stroke = {
+    layer: 'all',
+    mode: 'reveal',
+    affectedTiles: new Map(),
+    bounds: null,
+  };
+  const minTx = Math.max(0, Math.floor((mx - radius) / TILE_SIZE));
+  const maxTx = Math.min(Math.floor((state.mapCanvas.width - 1) / TILE_SIZE), Math.floor((mx + radius) / TILE_SIZE));
+  const minTy = Math.max(0, Math.floor((my - radius) / TILE_SIZE));
+  const maxTy = Math.min(Math.floor((state.mapCanvas.height - 1) / TILE_SIZE), Math.floor((my + radius) / TILE_SIZE));
+  for (let ty = minTy; ty <= maxTy; ty++) {
+    for (let tx = minTx; tx <= maxTx; tx++) {
+      const rx = tx * TILE_SIZE, ry = ty * TILE_SIZE;
+      const rw = Math.min(TILE_SIZE, state.mapCanvas.width - rx);
+      const rh = Math.min(TILE_SIZE, state.mapCanvas.height - ry);
+      if (rw > 0 && rh > 0) captureStrokeTile(stroke, tx, ty, { x: rx, y: ry, w: rw, h: rh }, layerKeys);
+    }
+  }
+  if (stroke.affectedTiles.size === 0) return false;
+  for (const layerKey of layerKeys) paintCircleOnFogLayer(layerKey, mx, my, radius, 'reveal');
+  stroke.bounds = { x: mx - radius, y: my - radius, w: radius * 2, h: radius * 2 };
+  pushUndo({ type: 'fog', kind: 'tiles', layer: 'all', tiles: [...stroke.affectedTiles.values()] });
+  state.strokesSinceCheckpoint += 1;
+  maybeCheckpoint();
+  refreshSelectionUi();
+  scheduleRender(stroke.bounds);
+  return true;
+}
+
 function paintBrushAt(sx, sy) {
   if (!state.activeStroke) return;
   if (!state.hasMap) return;
@@ -5592,6 +5640,8 @@ async function createTokenFromFile(file, opts) {
     shape: opts.shape, borderColor: opts.borderColor, borderPattern: opts.borderPattern,
     name, x: cx, y: cy, size: baseSize, zOrder: state.tokens.length,
     entryIds: normalizeEntryIds(opts.entryIds || []),
+    explorerEnabled: !!opts.explorerEnabled,
+    exploreRadius: normalizeTokenExploreRadius(opts.exploreRadius),
   };
   state.tokens.push(token);
   setSelectedObject('token', token.id, { render: false });
@@ -5609,6 +5659,8 @@ async function rebuildTokenFromSerialized(s) {
     borderColor: s.borderColor, borderPattern: s.borderPattern, name: s.name,
     x: s.x, y: s.y, size: s.size, zOrder: s.zOrder,
     entryIds: cleanEntryIds(s.entryIds || []),
+    explorerEnabled: !!s.explorerEnabled,
+    exploreRadius: normalizeTokenExploreRadius(s.exploreRadius),
   };
 }
 
@@ -6717,6 +6769,9 @@ function onPointerUp(e) {
   } else if (info.role === 'reveal' || info.role === 'cover' || info.role === 'reveal-all') {
     onStrokeEnd(false);
   } else if (info.role === 'token-drag') {
+    const t = state.tokens.find((tt) => tt.id === info.tokenId);
+    const moved = t && dist(info.startX, info.startY, info.lastX, info.lastY) > EVENT_DRAG_THRESHOLD;
+    if (moved && t.explorerEnabled) paintTokenExploreFog(t);
     triggerImmediateSave();
   } else if (info.role === 'annotation-drag') {
     const ann = state.annotations.find((a) => a.id === info.annotationId);
@@ -7517,7 +7572,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.22.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.23.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -9605,6 +9660,8 @@ function openTokenUploadDialog(file, existingId) {
   const initColor = editing ? editing.borderColor : '#3b82f6';
   const initName = editing ? editing.name : '';
   const initEntryIds = editing ? editing.entryIds : [];
+  const initExplorerEnabled = editing ? !!editing.explorerEnabled : false;
+  const initExploreRadius = editing ? normalizeTokenExploreRadius(editing.exploreRadius) : TOKEN_EXPLORE_RADIUS_DEFAULT;
   showModal(`
     <div class="modal-title">${editing ? '编辑 Token' : '添加 Token'}</div>
     <div id="token-preview"></div>
@@ -9628,6 +9685,11 @@ function openTokenUploadDialog(file, existingId) {
     <div class="form-row">
       <label>名字（可选）</label>
       <input id="token-name" type="text" maxlength="40" placeholder="留空不显示标签">
+    </div>
+    <div class="form-row">
+      <label class="form-check" style="margin-bottom:8px;"><input id="token-explorer-enabled" type="checkbox"${initExplorerEnabled ? ' checked' : ''}> 探索 Token</label>
+      <input id="token-explore-radius" type="range" min="${TOKEN_EXPLORE_RADIUS_MIN}" max="${TOKEN_EXPLORE_RADIUS_MAX}" step="5" value="${Math.round(initExploreRadius)}">
+      <div class="form-note">清雾半径：<span id="token-explore-radius-value">${Math.round(initExploreRadius)}</span> px。拖动结束后清除地形层和事件层遮罩。</div>
     </div>
     ${entryAssignmentHTML(initEntryIds)}
     <div class="modal-actions">
@@ -9672,11 +9734,30 @@ function openTokenUploadDialog(file, existingId) {
         });
       });
       $('token-name').value = initName;
+      const explorerInput = $('token-explorer-enabled');
+      const radiusInput = $('token-explore-radius');
+      const radiusValue = $('token-explore-radius-value');
+      const syncExplorerControls = () => {
+        const enabled = !!explorerInput.checked;
+        radiusInput.disabled = !enabled;
+        radiusValue.textContent = Math.round(normalizeTokenExploreRadius(radiusInput.value));
+      };
+      explorerInput.addEventListener('change', syncExplorerControls);
+      radiusInput.addEventListener('input', syncExplorerControls);
+      syncExplorerControls();
       const cleanup = () => { if (previewUrl) try { URL.revokeObjectURL(previewUrl); } catch (_) {} };
       $('token-cancel').addEventListener('click', () => { cleanup(); closeModal(); });
       $('token-confirm').addEventListener('click', async () => {
         const name = $('token-name').value.trim();
-        const opts = { shape: selShape, borderColor: selColor || null, borderPattern: selPattern, name, entryIds: getEntryIds() };
+        const opts = {
+          shape: selShape,
+          borderColor: selColor || null,
+          borderPattern: selPattern,
+          name,
+          entryIds: getEntryIds(),
+          explorerEnabled: !!explorerInput.checked,
+          exploreRadius: normalizeTokenExploreRadius(radiusInput.value),
+        };
         cleanup();
         closeModal();
         if (editing) {
@@ -9685,6 +9766,8 @@ function openTokenUploadDialog(file, existingId) {
           editing.borderPattern = opts.borderPattern;
           editing.name = opts.name;
           editing.entryIds = opts.entryIds;
+          editing.explorerEnabled = opts.explorerEnabled;
+          editing.exploreRadius = opts.exploreRadius;
           scheduleRender('all');
           updateObjectPanel();
           triggerImmediateSave();
