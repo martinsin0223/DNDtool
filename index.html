@@ -192,6 +192,39 @@ button.icon { padding: 6px 10px; }
   gap: 8px;
   backdrop-filter: blur(8px);
 }
+
+/* ============== Reveal zones ============== */
+#reveal-zone-panel {
+  position: fixed;
+  left: 50%;
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 45;
+  min-width: min(520px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  background: color-mix(in srgb, var(--theme-panel) 94%, #000 6%);
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgba(0,0,0,.42);
+  padding: 10px 12px;
+}
+#reveal-zone-panel .panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--theme-text);
+  margin-bottom: 4px;
+}
+#reveal-zone-panel .panel-meta {
+  font-size: 12px;
+  color: var(--theme-text-muted);
+  margin-bottom: 8px;
+}
+#reveal-zone-panel .panel-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
 #grid-calibration-panel .panel-title {
   font-weight: 600;
   color: var(--theme-text);
@@ -1957,6 +1990,8 @@ const state = {
   eventCardOpenId: null,
   entries: [],
   activeEntryId: null, // 运行态，不持久化、不导出；只控制当前现场聚光
+  revealZones: [],
+  revealZoneDraft: null,
   // 撤销栈（合并：fog + event 操作）
   undoStack: [],
   checkpoints: [],
@@ -2250,12 +2285,13 @@ function updateSurfaceChrome() {
 
 function canUseEditTools() {
   return isEditSurface() && !state.gridCalibration &&
-    state.uiMode !== 'modal' && state.uiMode !== 'grid-calibration';
+    state.uiMode !== 'modal' && state.uiMode !== 'grid-calibration' && state.uiMode !== 'reveal-zone';
 }
 
 function requireEditSurface() {
   if (canUseEditTools()) return true;
   if (state.gridCalibration) showToast('请先完成或取消网格校准');
+  else if (state.revealZoneDraft) showToast('请先保存或取消揭示区域选择');
   else showToast('请先进入编辑态');
   return false;
 }
@@ -2434,10 +2470,10 @@ function objectEntryNames(item) {
 }
 
 function collectEntryCounts() {
-  const counts = new Map((state.entries || []).map((entry) => [entry.id, { event: 0, token: 0, annotation: 0, total: 0 }]));
+  const counts = new Map((state.entries || []).map((entry) => [entry.id, { event: 0, token: 0, annotation: 0, zone: 0, total: 0 }]));
   const add = (kind, item) => {
     for (const id of objectEntryIds(item)) {
-      if (!counts.has(id)) counts.set(id, { event: 0, token: 0, annotation: 0, total: 0 });
+      if (!counts.has(id)) counts.set(id, { event: 0, token: 0, annotation: 0, zone: 0, total: 0 });
       const row = counts.get(id);
       row[kind] += 1;
       row.total += 1;
@@ -2446,6 +2482,7 @@ function collectEntryCounts() {
   state.events.forEach((item) => add('event', item));
   state.tokens.forEach((item) => add('token', item));
   state.annotations.forEach((item) => add('annotation', item));
+  (state.revealZones || []).forEach((item) => add('zone', item));
   return counts;
 }
 
@@ -2486,7 +2523,84 @@ function pruneEntryReferences() {
   state.events.forEach(prune);
   state.tokens.forEach(prune);
   state.annotations.forEach(prune);
+  (state.revealZones || []).forEach(prune);
   if (state.activeEntryId && !liveIds.has(state.activeEntryId)) state.activeEntryId = null;
+}
+
+function normalizeRevealZoneLayer(layer) {
+  if (layer === 'event' || layer === 'all') return layer;
+  return 'terrain';
+}
+
+function revealZoneLayerLabel(layer) {
+  const clean = normalizeRevealZoneLayer(layer);
+  if (clean === 'all') return '双层';
+  return clean === 'event' ? '事件层' : '地形层';
+}
+
+function cloneRevealZoneGrid(grid) {
+  const g = normalizeGridSettings(grid || state.grid);
+  return {
+    enabled: true,
+    type: normalizeGridType(g.type),
+    cellSize: g.cellSize,
+    offsetX: g.offsetX,
+    offsetY: g.offsetY,
+    rotation: normalizeGridRotationForType(g.type, g.rotation || 0),
+    lineColor: g.lineColor,
+    lineOpacity: g.lineOpacity,
+  };
+}
+
+function parseGridCellKey(key) {
+  const raw = String(key || '');
+  let m = raw.match(/^hex:(-?\d+),(-?\d+)$/);
+  if (m) return { type: 'hex', q: parseInt(m[1], 10), r: parseInt(m[2], 10) };
+  m = raw.match(/^square:(-?\d+),(-?\d+)$/);
+  if (m) return { type: 'square', col: parseInt(m[1], 10), row: parseInt(m[2], 10) };
+  return null;
+}
+
+function normalizeRevealZoneCells(cells) {
+  const out = [];
+  const seen = new Set();
+  for (const key of cells || []) {
+    const cell = parseGridCellKey(key);
+    if (!cell) continue;
+    const clean = gridCellKey(cell);
+    if (seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+  }
+  return out.sort();
+}
+
+function normalizeRevealZones(zones, entries = state.entries) {
+  const cleanEntries = normalizeEntries(entries || []);
+  return (zones || []).map((zone) => {
+    const grid = cloneRevealZoneGrid(zone.grid || state.grid);
+    const cells = normalizeRevealZoneCells(zone.cells || []).filter((key) => key.startsWith(`${grid.type}:`));
+    if (!cells.length) return null;
+    return {
+      id: zone.id || uuid(),
+      name: String(zone.name || '揭示区域').trim().slice(0, 40) || '揭示区域',
+      layer: normalizeRevealZoneLayer(zone.layer),
+      entryIds: normalizeEntryIdsForEntries(zone.entryIds || [], cleanEntries),
+      cells,
+      grid,
+      createdAt: zone.createdAt || Date.now(),
+      updatedAt: zone.updatedAt || zone.createdAt || Date.now(),
+    };
+  }).filter(Boolean);
+}
+
+function revealZoneEntryNames(zone) {
+  return objectEntryIds(zone).map((id) => getEntryById(id)).filter(Boolean).map((entry) => entry.name);
+}
+
+function revealZonesForEntry(entryId) {
+  if (!entryId) return [];
+  return (state.revealZones || []).filter((zone) => objectEntryIds(zone).includes(entryId));
 }
 
 function setActiveEntry(entryId) {
@@ -3247,6 +3361,7 @@ async function serializeActiveSceneData() {
     entryIds: objectEntryIds(ev),
   }));
   const annotationsSerialized = state.annotations.map(serializeAnnotation);
+  const revealZonesSerialized = normalizeRevealZones(state.revealZones, state.entries);
   const curScene = state.scenes[state.currentSceneId] || {};
   return {
     version: 2,  // scene 内部仍按 v2 saved 结构（向后兼容）
@@ -3261,6 +3376,7 @@ async function serializeActiveSceneData() {
     events: eventsSerialized,
     annotations: annotationsSerialized,
     entries: normalizeEntries(state.entries),
+    revealZones: revealZonesSerialized,
     view: { ...state.view },
     settings: {
       brushSize: state.brush.sizeScreen,
@@ -3429,6 +3545,7 @@ async function serializeSceneForBundle(sceneId, scene, opts = {}) {
     events: eventsExported,
     annotations: annotationsExported,
     entries: sceneEntries,
+    revealZones: normalizeRevealZones(scene.revealZones || [], sceneEntries),
     view: scene.view || null,
     settings: scene.settings || {},
   };
@@ -3512,6 +3629,7 @@ async function bundleScenePayloadToSaved(scenePayload) {
     if (ann.type === 'image') return { ...base, blob: await base64ToBlob(ann.blob) };
     return base;
   }));
+  const revealZones = normalizeRevealZones(scenePayload.revealZones || [], entries);
   return {
     version: 2,
     chapterNumber: sceneChapterNumber(scenePayload),
@@ -3525,6 +3643,7 @@ async function bundleScenePayloadToSaved(scenePayload) {
     events,
     annotations,
     entries,
+    revealZones,
     view: scenePayload.view || null,
     settings: scenePayload.settings || {},
     mapFingerprint: scenePayload.mapFingerprint || null,
@@ -4334,6 +4453,7 @@ function drawAll() {
   // 6. 网格线 overlay（v3.1，地图坐标系，token 之下）
   setMapTransform();
   drawGridOverlay(ctx);
+  drawRevealZoneOverlays(ctx);
 
   // 7. Token（最上层，永远可见）
   drawTokens(ctx);
@@ -4951,6 +5071,243 @@ function drawGridOverlay(ctx) {
   if (!state.hasMap) return;
   const cache = getGridCache(state.mapCanvas.width, state.mapCanvas.height);
   ctx.drawImage(cache, 0, 0);
+}
+
+function drawRevealZoneCellOverlay(ctx, zone, fill, stroke, alpha = 0.28) {
+  if (!zone || !zone.grid) return;
+  const cells = normalizeRevealZoneCells(zone.cells || []).filter((key) => key.startsWith(`${zone.grid.type}:`));
+  if (!cells.length) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = Math.max(1, 1 / Math.max(state.view.scale || 1, 0.1));
+  for (const key of cells) {
+    const cell = parseGridCellKey(key);
+    if (!cell) continue;
+    ctx.beginPath();
+    gridCellPath(ctx, cell, zone.grid);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawRevealZoneOverlays(ctx) {
+  const activeEntry = getEntryById(state.activeEntryId);
+  if (activeEntry) {
+    const zones = revealZonesForEntry(activeEntry.id);
+    for (const zone of zones) {
+      drawRevealZoneCellOverlay(ctx, zone, activeEntry.color || '#d6ae5c', activeEntry.color || '#d6ae5c', 0.18);
+    }
+  }
+  const draft = state.revealZoneDraft;
+  if (draft) {
+    drawRevealZoneCellOverlay(ctx, {
+      ...draft,
+      cells: Array.from(draft.cells || []),
+    }, '#d6ae5c', '#fff2c7', 0.34);
+  }
+}
+
+function ensureRevealZonePanel() {
+  let panel = $('reveal-zone-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'reveal-zone-panel';
+    document.body.appendChild(panel);
+  }
+  return panel;
+}
+
+function removeRevealZonePanel() {
+  const panel = $('reveal-zone-panel');
+  if (panel) panel.remove();
+}
+
+function renderRevealZonePanel() {
+  const draft = state.revealZoneDraft;
+  if (!draft) { removeRevealZonePanel(); return; }
+  const panel = ensureRevealZonePanel();
+  const count = draft.cells ? draft.cells.size : 0;
+  panel.innerHTML = `
+    <div class="panel-title">正在选择揭示区域：${escapeHtml(draft.name)}</div>
+    <div class="panel-meta">${revealZoneLayerLabel(draft.layer)} · 已选 ${count} 格 · 拖动添加，按住 Alt 拖动移除</div>
+    <div class="panel-actions">
+      <button id="reveal-zone-draft-clear">清空</button>
+      <button id="reveal-zone-draft-cancel">取消</button>
+      <button id="reveal-zone-draft-save" class="primary" ${count ? '' : 'disabled'}>保存区域</button>
+    </div>
+  `;
+  $('reveal-zone-draft-clear').onclick = () => {
+    draft.cells.clear();
+    draft.lastCell = null;
+    renderRevealZonePanel();
+    scheduleRender('all');
+  };
+  $('reveal-zone-draft-cancel').onclick = cancelRevealZoneDraft;
+  $('reveal-zone-draft-save').onclick = finishRevealZoneDraft;
+}
+
+function startRevealZoneDraft(opts = {}) {
+  if (!requireEditSurface()) return;
+  if (!state.hasMap) { showToast('请先加载地图'); return; }
+  if (!state.grid.enabled) { showToast('请先开启网格，再创建揭示区域'); return; }
+  if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
+  const existing = opts.zone || null;
+  const grid = existing?.grid ? cloneRevealZoneGrid(existing.grid) : cloneRevealZoneGrid(state.grid);
+  state.revealZoneDraft = {
+    zoneId: existing?.id || null,
+    name: String(opts.name || existing?.name || '揭示区域').trim().slice(0, 40) || '揭示区域',
+    layer: normalizeRevealZoneLayer(opts.layer || existing?.layer || state.currentLayer),
+    entryIds: normalizeEntryIds(opts.entryIds || existing?.entryIds || []),
+    grid,
+    cells: new Set(normalizeRevealZoneCells(existing?.cells || [])),
+    lastCell: null,
+    removing: false,
+  };
+  closeModal();
+  state.uiMode = 'reveal-zone';
+  hideDropdown();
+  renderRevealZonePanel();
+  scheduleRender('all');
+}
+
+function cancelRevealZoneDraft() {
+  state.revealZoneDraft = null;
+  state.uiMode = 'normal';
+  removeRevealZonePanel();
+  scheduleRender('all');
+  showToast('已取消揭示区域选择', 1400);
+}
+
+function finishRevealZoneDraft() {
+  const draft = state.revealZoneDraft;
+  if (!draft || !draft.cells || !draft.cells.size) { showToast('至少选择 1 个格子'); return; }
+  const zone = normalizeRevealZones([{
+    id: draft.zoneId || uuid(),
+    name: draft.name,
+    layer: draft.layer,
+    entryIds: draft.entryIds,
+    cells: Array.from(draft.cells),
+    grid: draft.grid,
+    createdAt: draft.zoneId ? (state.revealZones.find((z) => z.id === draft.zoneId)?.createdAt || Date.now()) : Date.now(),
+    updatedAt: Date.now(),
+  }], state.entries)[0];
+  if (!zone) { showToast('揭示区域无有效格子'); return; }
+  if (draft.zoneId) {
+    const idx = state.revealZones.findIndex((item) => item.id === draft.zoneId);
+    if (idx >= 0) state.revealZones[idx] = zone;
+    else state.revealZones.push(zone);
+  } else {
+    state.revealZones.push(zone);
+  }
+  state.revealZones = normalizeRevealZones(state.revealZones, state.entries);
+  state.revealZoneDraft = null;
+  state.uiMode = 'normal';
+  removeRevealZonePanel();
+  pruneEntryReferences();
+  triggerImmediateSave();
+  scheduleRender('all');
+  showToast('已保存揭示区域', 1800);
+  openRevealZonesModal();
+}
+
+function applyRevealZonePointerCell(sx, sy, remove = false) {
+  const draft = state.revealZoneDraft;
+  if (!draft) return;
+  const [mx, my] = screenToMap(sx, sy);
+  if (!insideMap(mx, my)) return;
+  const cell = gridCellAtPoint(mx, my, draft.grid);
+  const key = gridCellKey(cell);
+  if (draft.lastCell === key) return;
+  draft.lastCell = key;
+  if (remove) draft.cells.delete(key);
+  else draft.cells.add(key);
+  renderRevealZonePanel();
+  scheduleRender('all');
+}
+
+function handleRevealZonePointerDown(info, e, sx, sy) {
+  info.role = 'reveal-zone-select';
+  info.removeFromZone = !!e.altKey;
+  state.revealZoneDraft.removing = info.removeFromZone;
+  state.revealZoneDraft.lastCell = null;
+  applyRevealZonePointerCell(sx, sy, info.removeFromZone);
+}
+
+function getRevealZoneLayerKeys(zone) {
+  const layer = normalizeRevealZoneLayer(zone?.layer);
+  return layer === 'all' ? ['terrain', 'event'] : [layer];
+}
+
+function paintRevealZoneCells(zone) {
+  if (!zone || !zone.cells?.length) return false;
+  const grid = cloneRevealZoneGrid(zone.grid || state.grid);
+  const layerKeys = getRevealZoneLayerKeys(zone);
+  const stroke = {
+    layer: normalizeRevealZoneLayer(zone.layer) === 'all' ? 'all' : normalizeRevealZoneLayer(zone.layer),
+    mode: 'reveal',
+    affectedTiles: new Map(),
+    bounds: null,
+  };
+  for (const key of normalizeRevealZoneCells(zone.cells).filter((item) => item.startsWith(`${grid.type}:`))) {
+    const cell = parseGridCellKey(key);
+    if (!cell) continue;
+    const bounds = gridCellBounds(cell, grid);
+    const minX = bounds.x, maxX = bounds.x + bounds.w;
+    const minY = bounds.y, maxY = bounds.y + bounds.h;
+    if (maxX < 0 || minX > state.mapCanvas.width) continue;
+    if (maxY < 0 || minY > state.mapCanvas.height) continue;
+    const minTx = Math.max(0, Math.floor(minX / TILE_SIZE));
+    const maxTx = Math.min(Math.floor((state.mapCanvas.width - 1) / TILE_SIZE), Math.floor(maxX / TILE_SIZE));
+    const minTy = Math.max(0, Math.floor(minY / TILE_SIZE));
+    const maxTy = Math.min(Math.floor((state.mapCanvas.height - 1) / TILE_SIZE), Math.floor(maxY / TILE_SIZE));
+    for (let ty = minTy; ty <= maxTy; ty++) {
+      for (let tx = minTx; tx <= maxTx; tx++) {
+        const rx = tx * TILE_SIZE, ry = ty * TILE_SIZE;
+        const rw = Math.min(TILE_SIZE, state.mapCanvas.width - rx);
+        const rh = Math.min(TILE_SIZE, state.mapCanvas.height - ry);
+        if (rw > 0 && rh > 0) captureStrokeTile(stroke, tx, ty, { x: rx, y: ry, w: rw, h: rh }, layerKeys);
+      }
+    }
+    for (const layerKey of layerKeys) {
+      const ctx = state.fogLayers[layerKey].ctx;
+      ctx.save();
+      gridCellPath(ctx, cell, grid);
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = '#000';
+      ctx.fill();
+      ctx.restore();
+    }
+    const dirty = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+    if (!stroke.bounds) stroke.bounds = { ...dirty };
+    else mergeRectInto(stroke.bounds, dirty);
+  }
+  if (stroke.affectedTiles.size === 0) return false;
+  pushUndo({ type: 'fog', kind: 'tiles', layer: stroke.layer, tiles: [...stroke.affectedTiles.values()] });
+  state.strokesSinceCheckpoint += 1;
+  maybeCheckpoint();
+  refreshSelectionUi();
+  triggerImmediateSave();
+  scheduleRender(stroke.bounds || 'all');
+  return true;
+}
+
+function revealZoneById(zoneId) {
+  const zone = (state.revealZones || []).find((item) => item.id === zoneId);
+  if (!zone) { showToast('揭示区域不存在'); return false; }
+  const ok = paintRevealZoneCells(zone);
+  showToast(ok ? `已揭示：${zone.name}` : '揭示区域没有有效格子', 1800);
+  return ok;
+}
+
+function revealZonesForEntryId(entryId) {
+  const zones = revealZonesForEntry(entryId);
+  let count = 0;
+  for (const zone of zones) if (paintRevealZoneCells(zone)) count += 1;
+  if (count) showToast(`已揭示 ${count} 个词条区域`, 1800);
+  else showToast('当前词条没有可揭示区域', 1800);
 }
 
 // ============== 撤销栈（合并单栈） ==============
@@ -6011,6 +6368,10 @@ function onPointerDown(e) {
     handleGridCalibrationPointerDown(info, e, sx, sy);
     return;
   }
+  if (state.revealZoneDraft) {
+    handleRevealZonePointerDown(info, e, sx, sy);
+    return;
+  }
 
   // 第二指落下：进入 pinch
   if (state.pointers.size === 2) {
@@ -6201,6 +6562,8 @@ function onPointerMove(e) {
   if (!info) return;
   if (info.role === 'grid-calibration') {
     moveGridCalibration(info, x, y);
+  } else if (info.role === 'reveal-zone-select') {
+    applyRevealZonePointerCell(x, y, info.removeFromZone);
   } else if (state.pointers.size >= 2 && info.role === 'pinch') {
     onPinchMove();
     info.lastX = x; info.lastY = y;
@@ -6276,6 +6639,8 @@ function onPointerUp(e) {
   if (!info) return;
   if (info.role === 'grid-calibration') {
     if (state.gridCalibration) state.gridCalibration.pointerId = null;
+  } else if (info.role === 'reveal-zone-select') {
+    if (state.revealZoneDraft) state.revealZoneDraft.lastCell = null;
   } else if (info.role === 'reveal' || info.role === 'cover' || info.role === 'reveal-all') {
     onStrokeEnd(false);
   } else if (info.role === 'token-drag') {
@@ -6324,6 +6689,8 @@ function onPointerCancel(e) {
   if (!info) return;
   if (info.role === 'grid-calibration') {
     if (state.gridCalibration) state.gridCalibration.pointerId = null;
+  } else if (info.role === 'reveal-zone-select') {
+    if (state.revealZoneDraft) state.revealZoneDraft.lastCell = null;
   } else if (info.role === 'reveal' || info.role === 'cover' || info.role === 'reveal-all') {
     if (state.activeStroke && state.activeStroke.affectedTiles.size >= 1) onStrokeEnd(true);
     else state.activeStroke = null;
@@ -6454,6 +6821,11 @@ function onKeyDown(e) {
   }
   if (state.gridCalibration && e.key === 'Enter') {
     finishGridCalibration(true);
+    e.preventDefault();
+    return;
+  }
+  if (state.revealZoneDraft && e.key === 'Escape') {
+    cancelRevealZoneDraft();
     e.preventDefault();
     return;
   }
@@ -6697,6 +7069,7 @@ function resetSceneWithPreparedMap(sceneId, file, preparedMap, nextFingerprint, 
   clearAnnotationRuntimeResources();
   state.tokens = []; state.events = []; state.annotations = [];
   state.entries = [];
+  state.revealZones = [];
   state.activeEntryId = null;
   clearSelection({ render: false });
   state.undoStack = [];
@@ -6723,6 +7096,7 @@ function createSceneWithPreparedMap(file, preparedMap, nextFingerprint, w, h) {
     mapFingerprint: nextFingerprint,
     mapSize: { w, h },
     entries: [],
+    revealZones: [],
     createdAt: Date.now(),
     lastUsedAt: Date.now(),
   };
@@ -6730,6 +7104,7 @@ function createSceneWithPreparedMap(file, preparedMap, nextFingerprint, w, h) {
   clearAnnotationRuntimeResources();
   state.tokens = []; state.events = []; state.annotations = [];
   state.entries = [];
+  state.revealZones = [];
   state.activeEntryId = null;
   clearSelection({ render: false });
   state.undoStack = [];
@@ -6959,6 +7334,7 @@ async function prepareSavedRestore(saved, mapSize) {
     return {
       terrainBmp, eventFogBmp,
       tokens, events, annotations,
+      revealZones: normalizeRevealZones(saved.revealZones || [], entries),
       entries,
       view: saved.view || null,
       settings: normalizeRestoredSettings(saved.settings),
@@ -6980,6 +7356,7 @@ function applyPreparedRestore(prepared, opts = {}) {
     state.events = prepared.events;
     state.annotations = prepared.annotations || [];
     state.entries = normalizeEntries(prepared.entries || []);
+    state.revealZones = normalizeRevealZones(prepared.revealZones || [], state.entries);
     state.activeEntryId = null;
     pruneEntryReferences();
     clearSelection({ render: false });
@@ -7061,7 +7438,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.19.1';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.20.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -9718,6 +10095,7 @@ function openEntrySpotlightModal() {
   const rows = entries.map((entry) => {
     const row = counts.get(entry.id) || { event: 0, token: 0, annotation: 0, total: 0 };
     const active = state.activeEntryId === entry.id;
+    const zoneText = row.zone ? ` · ${row.zone} 区` : '';
     return `
       <button class="info-tag-row${active ? ' active' : ''}" data-entry-id="${escapeHtml(entry.id)}">
         <span style="display:flex;align-items:center;gap:8px;min-width:0;">
@@ -9725,17 +10103,19 @@ function openEntrySpotlightModal() {
           ${entry.hotkey ? `<span class="entry-hotkey-badge">${escapeHtml(entry.hotkey)}</span>` : ''}
           <span class="info-tag-name">${escapeHtml(entry.name)}</span>
         </span>
-        <span class="info-tag-count">${canManage ? `${row.total} 项` : (active ? '已显露' : '选择')}</span>
+        <span class="info-tag-count">${canManage ? `${row.total} 项${zoneText}` : (active ? `已显露${zoneText}` : `选择${zoneText}`)}</span>
       </button>
     `;
   }).join('');
   const title = state.activeEntryId ? `词条聚光：${escapeHtml(getEntryById(state.activeEntryId)?.name || '已选择')}` : '词条聚光';
+  const activeZoneCount = revealZonesForEntry(state.activeEntryId).length;
   showModal(`
     <div class="modal-title">${title}</div>
-    <div class="modal-desc">${canManage ? '选择一个词条可临时显露并高亮它关联的事件、Token 和标注；管理入口只在编辑态开放。' : '选择一个现场词条，只临时显露和高亮，不会改迷雾。'}</div>
+    <div class="modal-desc">${canManage ? '选择一个词条可临时显露并高亮它关联的对象和揭示区域；管理入口只在编辑态开放。' : '选择一个现场词条，只临时显露和高亮；若该词条绑定了区域，可手动一键揭示。'}</div>
     <div class="info-tag-list">${rows || '<div class="object-empty">当前场景还没有可用词条。</div>'}</div>
     <div class="modal-actions">
       ${canManage ? '<button id="entry-manage">管理词条</button>' : ''}
+      ${activeZoneCount ? `<button id="entry-reveal-zones">揭示当前词条区域（${activeZoneCount}）</button>` : ''}
       <button id="entry-clear">清除聚光</button>
       <button id="entry-close" class="primary">关闭</button>
     </div>
@@ -9751,8 +10131,111 @@ function openEntrySpotlightModal() {
       });
       const manage = $('entry-manage');
       if (manage) manage.addEventListener('click', () => { closeModal(); openEntryManagerModal(); });
+      const revealBtn = $('entry-reveal-zones');
+      if (revealBtn) revealBtn.addEventListener('click', () => {
+        const id = state.activeEntryId;
+        closeModal();
+        revealZonesForEntryId(id);
+      });
       $('entry-clear').addEventListener('click', () => { setActiveEntry(null); closeModal(); showToast('词条聚光已关闭'); });
       $('entry-close').addEventListener('click', closeModal);
+    }
+  });
+}
+
+// ============== 揭示区域 ==============
+function openRevealZoneEditor(zoneId = null) {
+  if (!requireEditSurface()) return;
+  if (!state.grid.enabled) { showToast('请先开启网格'); return; }
+  const editing = zoneId ? state.revealZones.find((zone) => zone.id === zoneId) : null;
+  const initName = editing ? editing.name : '新揭示区域';
+  const initLayer = editing ? normalizeRevealZoneLayer(editing.layer) : state.currentLayer;
+  const initEntryIds = editing ? editing.entryIds : [];
+  showModal(`
+    <div class="modal-title">${editing ? '编辑揭示区域' : '新建揭示区域'}</div>
+    <div class="modal-desc">区域按当前网格格子保存。绑定词条后，跑团时可从词条或区域列表一键揭示。</div>
+    <label>名称</label>
+    <input id="reveal-zone-name" type="text" maxlength="40" value="${escapeHtml(initName)}">
+    <label style="margin-top:10px;">揭示目标</label>
+    <select id="reveal-zone-layer">
+      <option value="terrain"${initLayer === 'terrain' ? ' selected' : ''}>地形层</option>
+      <option value="event"${initLayer === 'event' ? ' selected' : ''}>事件层</option>
+      <option value="all"${initLayer === 'all' ? ' selected' : ''}>双层</option>
+    </select>
+    ${entryAssignmentHTML(initEntryIds)}
+    <div class="modal-actions">
+      <button id="reveal-zone-editor-cancel">取消</button>
+      <button id="reveal-zone-editor-start" class="primary">开始选格</button>
+    </div>
+  `, {
+    onMounted: () => {
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
+      $('reveal-zone-editor-cancel').onclick = closeModal;
+      $('reveal-zone-editor-start').onclick = () => {
+        const name = $('reveal-zone-name').value.trim() || '揭示区域';
+        const layer = normalizeRevealZoneLayer($('reveal-zone-layer').value);
+        const entryIds = getEntryIds();
+        startRevealZoneDraft({ zone: editing, name, layer, entryIds });
+      };
+    }
+  });
+}
+
+function deleteRevealZone(zoneId) {
+  const zone = state.revealZones.find((item) => item.id === zoneId);
+  if (!zone) return;
+  showConfirm('删除揭示区域', `确定删除"${zone.name}"？这不会改变已经揭开的迷雾。`, () => {
+    state.revealZones = state.revealZones.filter((item) => item.id !== zoneId);
+    triggerImmediateSave();
+    scheduleRender('all');
+    openRevealZonesModal();
+  }, { danger: true, yesText: '删除' });
+}
+
+function openRevealZonesModal() {
+  if (!state.hasMap) { showToast('请先加载地图'); return; }
+  state.revealZones = normalizeRevealZones(state.revealZones, state.entries);
+  const canManage = isEditSurface();
+  const zones = state.revealZones || [];
+  const rows = zones.map((zone) => {
+    const entries = revealZoneEntryNames(zone);
+    const entryText = entries.length ? ` · 词条：${entries.join('、')}` : '';
+    return `
+      <div class="scene-row">
+        <div style="flex:1;min-width:0;">
+          <div class="scene-name">${escapeHtml(zone.name)}</div>
+          <div class="scene-meta">${revealZoneLayerLabel(zone.layer)} · ${zone.cells.length} 格${escapeHtml(entryText)}</div>
+        </div>
+        <div class="scene-actions">
+          <button class="reveal-zone-apply" data-zone-id="${escapeHtml(zone.id)}">揭示</button>
+          ${canManage ? `<button class="reveal-zone-edit" data-zone-id="${escapeHtml(zone.id)}">编辑</button>` : ''}
+          ${canManage ? `<button class="reveal-zone-delete danger" data-zone-id="${escapeHtml(zone.id)}">删除</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('') || '<div class="modal-desc">当前场景还没有揭示区域。</div>';
+  showModal(`
+    <div class="modal-title">揭示区域</div>
+    <div class="modal-desc">${canManage ? '提前选好网格区域，跑团时一键揭示。不会自动触发，始终由 DM 手动执行。' : '选择一个预设区域，直接揭开对应迷雾。'}</div>
+    <div class="scene-list">${rows}</div>
+    <div class="modal-actions">
+      ${canManage ? '<button id="reveal-zone-new">新建区域</button>' : ''}
+      <button id="reveal-zone-close" class="primary">关闭</button>
+    </div>
+  `, {
+    onMounted: () => {
+      document.querySelectorAll('.reveal-zone-apply').forEach((btn) => {
+        btn.onclick = () => { revealZoneById(btn.dataset.zoneId); closeModal(); };
+      });
+      document.querySelectorAll('.reveal-zone-edit').forEach((btn) => {
+        btn.onclick = () => openRevealZoneEditor(btn.dataset.zoneId);
+      });
+      document.querySelectorAll('.reveal-zone-delete').forEach((btn) => {
+        btn.onclick = () => deleteRevealZone(btn.dataset.zoneId);
+      });
+      const newBtn = $('reveal-zone-new');
+      if (newBtn) newBtn.onclick = () => openRevealZoneEditor();
+      $('reveal-zone-close').onclick = closeModal;
     }
   });
 }
@@ -9819,6 +10302,7 @@ function openEntryManagerModal() {
             state.events.forEach((item) => item.entryIds = objectEntryIds(item).filter((x) => x !== id));
             state.tokens.forEach((item) => item.entryIds = objectEntryIds(item).filter((x) => x !== id));
             state.annotations.forEach((item) => item.entryIds = objectEntryIds(item).filter((x) => x !== id));
+            (state.revealZones || []).forEach((item) => item.entryIds = objectEntryIds(item).filter((x) => x !== id));
             if (state.activeEntryId === id) state.activeEntryId = null;
             updateEntryButton();
             updateObjectPanel();
@@ -9883,6 +10367,10 @@ function openEntryManagerModal() {
 function showDropdown() {
   if (state.gridCalibration) {
     showToast('请先完成或取消网格校准');
+    return;
+  }
+  if (state.revealZoneDraft) {
+    showToast('请先保存或取消揭示区域选择');
     return;
   }
   const menu = $('dropdown-menu');
@@ -9967,6 +10455,11 @@ function showDropdown() {
   const sceneBtn = mkMenuItem(isEditSurface() ? `📚 场景管理（${sceneCount}）` : `📚 切换场景（${sceneCount}）`);
   sceneBtn.addEventListener('click', () => { hideDropdown(); openSceneManagerModal(); });
   menu.appendChild(sceneBtn);
+
+  const zoneCount = (state.revealZones || []).length;
+  const revealZoneBtn = mkMenuItem(`◇ 揭示区域（${zoneCount}）`);
+  revealZoneBtn.addEventListener('click', () => { hideDropdown(); openRevealZonesModal(); });
+  menu.appendChild(revealZoneBtn);
 
   if (isEditSurface()) {
     const clearCpBtn = mkMenuItem('清理全部 Checkpoint');
