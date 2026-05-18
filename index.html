@@ -2016,6 +2016,11 @@ const state = {
     gcRunning: false,
     lastError: null,
   },
+  placeholderRestore: {
+    targetSceneId: null,
+    sourceSnapshotId: null,
+    awaitingLocalFilePick: false,
+  },
   isCoarsePointer: matchMedia('(pointer: coarse)').matches,
   _warnedBrushCap: false,
 };
@@ -3864,6 +3869,7 @@ async function deleteScene(id) {
 function openSceneManagerModal() {
   const ids = Object.keys(state.scenes);
   const canEditScenes = isEditSurface();
+  const placeholderCount = ids.filter((id) => sceneNeedsLocalMap(state.scenes[id])).length;
   // 按 lastUsedAt 倒序
   ids.sort((a, b) => (state.scenes[b].lastUsedAt || 0) - (state.scenes[a].lastUsedAt || 0));
   const rows = ids.map((id) => {
@@ -3890,11 +3896,17 @@ function openSceneManagerModal() {
     <div class="scene-list">${rows || '<div style="color:var(--theme-text-muted);padding:20px;text-align:center;">暂无场景，先加载一张地图</div>'}</div>
     <div class="modal-actions">
       <button id="scene-close">关闭</button>
+      ${canEditScenes && placeholderCount ? `<button id="scene-placeholder-wizard">恢复占位地图（${placeholderCount}）</button>` : ''}
       ${canEditScenes ? '<button id="scene-new" class="primary">+ 新建场景（加载地图）</button>' : ''}
     </div>
   `, {
     onMounted: () => {
       $('scene-close').addEventListener('click', closeModal);
+      if (canEditScenes && placeholderCount) {
+        $('scene-placeholder-wizard').addEventListener('click', () => {
+          showPlaceholderRestoreWizard();
+        });
+      }
       if (canEditScenes) {
         $('scene-new').addEventListener('click', () => {
           closeModal();
@@ -6805,10 +6817,12 @@ async function loadMapFile(file) {
       const w = preparedMap.w, h = preparedMap.h;
       const nextFingerprint = `${file.name}-${file.size}-${file.lastModified || 0}-${w}x${h}`;
 
-      const currentScene = state.currentSceneId ? state.scenes[state.currentSceneId] : null;
+      const bindTargetSceneId = cloudSync_getPlaceholderRestoreTargetSceneId();
+      const currentScene = bindTargetSceneId ? state.scenes[bindTargetSceneId] : (state.currentSceneId ? state.scenes[state.currentSceneId] : null);
       if (sceneNeedsLocalMap(currentScene)) {
         const expected = currentScene.mapSize;
         if (expected.w !== w || expected.h !== h) {
+          cloudSync_clearPlaceholderRestoreTarget();
           hideLoading();
           showToast(`地图尺寸不一致：需要 ${expected.w}×${expected.h}，当前是 ${w}×${h}`, 5200);
           return;
@@ -6817,8 +6831,12 @@ async function loadMapFile(file) {
         showConfirm(
           '绑定本机地图',
           `这张图尺寸匹配当前占位场景。绑定后会保留遮罩、Token、事件和标注。`,
-          () => restoreSceneWithPreparedMap(state.currentSceneId, file, preparedMap, nextFingerprint, w, h),
-          { yesText: '绑定', noText: '取消' }
+          () => {
+            const targetSceneId = bindTargetSceneId || state.currentSceneId;
+            cloudSync_clearPlaceholderRestoreTarget();
+            return restoreSceneWithPreparedMap(targetSceneId, file, preparedMap, nextFingerprint, w, h);
+          },
+          { yesText: '绑定', noText: '取消', onNo: cloudSync_clearPlaceholderRestoreTarget }
         );
         return;
       }
@@ -7043,7 +7061,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.18.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.19.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -7158,6 +7176,53 @@ function cloudSync_localDraftBackupText() {
 function cloudSync_placeholderNextStepText(count) {
   if (!count) return '';
   return `有 ${count} 张大地图是占位图。下一步：进入编辑态，给占位场景绑定同尺寸本机地图，或打开云端地图库绑定 manual-maps 里的同尺寸图片。`;
+}
+function cloudSync_getPlaceholderScenes() {
+  return Object.entries(state.scenes || {})
+    .filter(([, scene]) => sceneNeedsLocalMap(scene))
+    .map(([sceneId, scene]) => ({ sceneId, scene }));
+}
+function cloudSync_setPlaceholderRestoreTarget(sceneId) {
+  state.placeholderRestore.targetSceneId = sceneId && state.scenes[sceneId] ? sceneId : null;
+}
+function cloudSync_clearPlaceholderRestoreTarget() {
+  cloudSync_setPlaceholderRestoreTarget(null);
+  state.placeholderRestore.awaitingLocalFilePick = false;
+}
+function cloudSync_armLocalPlaceholderFilePick(sceneId) {
+  cloudSync_setPlaceholderRestoreTarget(sceneId);
+  state.placeholderRestore.awaitingLocalFilePick = true;
+}
+function cloudSync_disarmPlaceholderFilePickAfterWindowRefocus() {
+  if (!state.placeholderRestore.awaitingLocalFilePick) return;
+  setTimeout(() => {
+    if (!state.placeholderRestore.awaitingLocalFilePick) return;
+    cloudSync_clearPlaceholderRestoreTarget();
+  }, 0);
+}
+function cloudSync_getPlaceholderRestoreTargetSceneId() {
+  const targetSceneId = state.placeholderRestore.targetSceneId;
+  if (targetSceneId && state.scenes[targetSceneId]) return targetSceneId;
+  return state.currentSceneId && state.scenes[state.currentSceneId] ? state.currentSceneId : null;
+}
+function cloudSync_openLocalPlaceholderBind(sceneId) {
+  if (!sceneId || !state.scenes[sceneId]) {
+    showToast('待绑定场景不存在', 3600);
+    return;
+  }
+  cloudSync_armLocalPlaceholderFilePick(sceneId);
+  if (state.currentSceneId !== sceneId) {
+    closeModal();
+    switchScene(sceneId).then(() => {
+      $('file-input-map').click();
+    }).catch((err) => {
+      console.error('switch scene before local placeholder bind failed:', err);
+      showToast('切换待绑定场景失败', 3600);
+    });
+    return;
+  }
+  closeModal();
+  $('file-input-map').click();
 }
 function cloudSync_manualMapMatchStatus(manualMap, scene) {
   if (!sceneNeedsLocalMap(scene)) return { status: 'none', label: '当前场景不可绑定', canBind: false };
@@ -8437,6 +8502,15 @@ async function cloudSync_restoreSnapshot({ owner, repo, token, snapshotId }) {
     hideLoading();
     const placeholderCount = manifest.maps.filter((item) => cloudSync_isPlaceholderMapEntry(item)).length;
     showToast(placeholderCount ? `已读取云端进度 ✓ ${cloudSync_placeholderNextStepText(placeholderCount)}` : '已读取云端进度 ✓', 6500);
+    if (placeholderCount) {
+      state.placeholderRestore.sourceSnapshotId = manifest.snapshot_id;
+      setTimeout(() => {
+        if (isEditSurface()) showPlaceholderRestoreWizard();
+      }, 80);
+    } else {
+      state.placeholderRestore.sourceSnapshotId = null;
+      cloudSync_clearPlaceholderRestoreTarget();
+    }
     return true;
   } catch (err) {
     hideLoading();
@@ -8716,7 +8790,7 @@ async function cloudSync_bindManualRemoteMapToScene(sceneId, manualMap) {
     return false;
   }
 }
-async function showCloudSyncManualMapLibraryModal() {
+async function showCloudSyncManualMapLibraryModal(targetSceneId = null) {
   if (!isEditSurface()) { showToast('请先进入编辑态'); return; }
   const token = cloudSync_getToken();
   if (!token) { showToast('请先连接云存档'); return; }
@@ -8728,10 +8802,13 @@ async function showCloudSyncManualMapLibraryModal() {
       token,
     });
     hideLoading();
-    const currentScene = state.currentSceneId ? state.scenes[state.currentSceneId] : null;
+    const activeSceneId = targetSceneId && state.scenes[targetSceneId]
+      ? targetSceneId
+      : cloudSync_getPlaceholderRestoreTargetSceneId();
+    const currentScene = activeSceneId ? state.scenes[activeSceneId] : null;
     const canBind = sceneNeedsLocalMap(currentScene);
     const desc = canBind
-      ? `当前占位场景需要 ${currentScene.mapSize.w}×${currentScene.mapSize.h} 的地图。列表尺寸只是预判，点击绑定后仍会下载图片并实测尺寸。`
+      ? `目标占位场景需要 ${currentScene.mapSize.w}×${currentScene.mapSize.h} 的地图。列表尺寸只是预判，点击绑定后仍会下载图片并实测尺寸。`
       : '当前场景不是待绑定占位地图。你仍可查看云端地图库，但暂时不能绑定。';
     const rows = maps.map((item, idx) => {
       const match = cloudSync_manualMapMatchStatus(item, currentScene);
@@ -8762,14 +8839,24 @@ async function showCloudSyncManualMapLibraryModal() {
       </div>
     `, {
       onMounted: () => {
-        $('cloud-manual-back').onclick = showCloudSyncStatusView;
-        $('cloud-manual-close').onclick = closeModal;
+        $('cloud-manual-back').onclick = () => {
+          if (state.placeholderRestore.targetSceneId) showPlaceholderRestoreWizard();
+          else showCloudSyncStatusView();
+        };
+        $('cloud-manual-close').onclick = () => {
+          cloudSync_clearPlaceholderRestoreTarget();
+          closeModal();
+        };
         document.querySelectorAll('.manual-map-bind').forEach((btn) => {
           btn.onclick = async () => {
             const map = maps[parseInt(btn.dataset.index, 10)];
-            if (!map || !state.currentSceneId) return;
+            const bindSceneId = activeSceneId && state.scenes[activeSceneId] ? activeSceneId : null;
+            if (!map || !bindSceneId) return;
             closeModal();
-            await cloudSync_bindManualRemoteMapToScene(state.currentSceneId, map);
+            await cloudSync_bindManualRemoteMapToScene(bindSceneId, map);
+            if (state.placeholderRestore.targetSceneId === bindSceneId && !sceneNeedsLocalMap(state.scenes[bindSceneId])) {
+              cloudSync_clearPlaceholderRestoreTarget();
+            }
           };
         });
       }
@@ -8780,6 +8867,60 @@ async function showCloudSyncManualMapLibraryModal() {
     console.error('cloudSync manual map list failed:', errorObject);
     showToast(errorObject.userMessage || '读取云端地图库失败', 4200);
   }
+}
+function showPlaceholderRestoreWizard() {
+  const items = cloudSync_getPlaceholderScenes();
+  if (!items.length) {
+    cloudSync_clearPlaceholderRestoreTarget();
+    showToast('当前没有待绑定占位地图', 3200);
+    return;
+  }
+  const rows = items.map(({ sceneId, scene }) => {
+    const isCurrent = sceneId === state.currentSceneId;
+    const sizeText = cloudSync_formatMapSize(scene.mapSize);
+    return `
+      <div class="scene-row ${isCurrent ? 'current' : ''}">
+        <div style="flex:1;min-width:0;">
+          <div class="scene-name">${escapeHtml(scene.name || '未命名场景')}${isCurrent ? ' · 当前场景' : ''}</div>
+          <div class="scene-meta">需要 ${sizeText} · 占位地图待恢复</div>
+        </div>
+        <div class="scene-actions">
+          <button class="placeholder-bind-local" data-scene-id="${escapeHtml(sceneId)}">绑定本机图</button>
+          <button class="placeholder-bind-cloud" data-scene-id="${escapeHtml(sceneId)}">云端地图库</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  showModal(`
+    <div class="modal-title">🧭 占位地图恢复向导</div>
+    <div class="modal-desc">这些场景缺少原图，但迷雾、Token、事件和标注都还在。给每个场景绑定同尺寸地图后，现场状态会自动对回去。</div>
+    <div class="scene-list">${rows}</div>
+    <div class="modal-actions">
+      <button id="placeholder-restore-close">稍后处理</button>
+      <button id="placeholder-restore-cloud" class="primary">打开云存档</button>
+    </div>
+  `, {
+    onMounted: () => {
+      $('placeholder-restore-close').onclick = () => {
+        cloudSync_clearPlaceholderRestoreTarget();
+        closeModal();
+      };
+      $('placeholder-restore-cloud').onclick = openCloudSyncModal;
+      document.querySelectorAll('.placeholder-bind-local').forEach((btn) => {
+        btn.onclick = () => {
+          const sceneId = btn.dataset.sceneId;
+          cloudSync_openLocalPlaceholderBind(sceneId);
+        };
+      });
+      document.querySelectorAll('.placeholder-bind-cloud').forEach((btn) => {
+        btn.onclick = () => {
+          const sceneId = btn.dataset.sceneId;
+          cloudSync_setPlaceholderRestoreTarget(sceneId);
+          showCloudSyncManualMapLibraryModal(sceneId);
+        };
+      });
+    }
+  });
 }
 async function showCloudSyncHistoryModal() {
   setLoading('正在读取历史列表...');
@@ -10010,6 +10151,7 @@ async function onVisibilityChange() {
     state.hiddenAt = performance.now();
     flushAllPendingSaves();
   } else {
+    cloudSync_disarmPlaceholderFilePickAfterWindowRefocus();
     if (state.hiddenAt) {
       state.lastCheckpointAt += (performance.now() - state.hiddenAt);
       state.hiddenAt = 0;
@@ -10177,7 +10319,14 @@ function setupEventListeners() {
   });
   $('file-input-map').addEventListener('change', (e) => {
     const f = e.target.files[0];
-    if (f && requireEditSurface()) loadMapFile(f);
+    state.placeholderRestore.awaitingLocalFilePick = false;
+    if (!f) {
+      cloudSync_clearPlaceholderRestoreTarget();
+      e.target.value = '';
+      return;
+    }
+    if (requireEditSurface()) loadMapFile(f);
+    else cloudSync_clearPlaceholderRestoreTarget();
     e.target.value = '';
   });
 
