@@ -7061,7 +7061,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.19.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.19.1';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -7216,6 +7216,7 @@ function cloudSync_openLocalPlaceholderBind(sceneId) {
     switchScene(sceneId).then(() => {
       $('file-input-map').click();
     }).catch((err) => {
+      cloudSync_clearPlaceholderRestoreTarget();
       console.error('switch scene before local placeholder bind failed:', err);
       showToast('切换待绑定场景失败', 3600);
     });
@@ -8770,6 +8771,9 @@ async function cloudSync_bindManualRemoteMapToScene(sceneId, manualMap) {
     const h = preparedMap.h;
     const expected = scene.mapSize;
     if (!expected || expected.w !== w || expected.h !== h) {
+      if (state.placeholderRestore.targetSceneId === sceneId) {
+        cloudSync_clearPlaceholderRestoreTarget();
+      }
       hideLoading();
       showToast(`地图尺寸不一致：需要 ${expected?.w || '?'}×${expected?.h || '?'}，云端是 ${w}×${h}`, 6200);
       return false;
@@ -8784,6 +8788,9 @@ async function cloudSync_bindManualRemoteMapToScene(sceneId, manualMap) {
     showToast('已绑定云端地图库地图 ✓', 3600);
     return true;
   } catch (err) {
+    if (state.placeholderRestore.targetSceneId === sceneId) {
+      cloudSync_clearPlaceholderRestoreTarget();
+    }
     hideLoading();
     console.error('cloudSync bind manual map failed:', err);
     showToast('绑定云端地图失败：' + (err.userMessage || err.message || err), 5200);
