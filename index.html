@@ -7038,12 +7038,12 @@ function hideLoading() {
   }
 }
 
-// ============== 云存档（v3.17.0） ==============
+// ============== 云存档（v3.18.0） ==============
 const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.17.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.18.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -7052,6 +7052,7 @@ const CLOUD_SYNC_PENDING_PREFIX = 'pending';
 const CLOUD_SYNC_SNAPSHOTS_PREFIX = 'snapshots';
 const CLOUD_SYNC_MAPS_PREFIX = 'maps';
 const CLOUD_SYNC_MANUAL_MAPS_PREFIX = 'manual-maps';
+const CLOUD_SYNC_MANUAL_MAPS_INDEX_PATH = `${CLOUD_SYNC_MANUAL_MAPS_PREFIX}/index.json`;
 const CLOUD_SYNC_ACCEPT_JSON = 'application/vnd.github+json';
 const CLOUD_SYNC_ACCEPT_RAW = 'application/vnd.github.raw+json';
 const CLOUD_SYNC_SINGLE_LIMIT = 1 * 1024 * 1024;
@@ -7145,6 +7146,27 @@ function cloudSync_formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+function cloudSync_formatMapSize(mapSize) {
+  return isValidMapSize(mapSize) ? `${mapSize.w}×${mapSize.h}` : '尺寸未知';
+}
+function cloudSync_localDraftBackupText() {
+  return state.hasMap
+    ? '读取前会尝试把本机当前进度临时记在内存里；这不是长期快照，刷新页面后不会保留。'
+    : '这台电脑当前没有已加载地图，读取云端会直接打开云端进度。';
+}
+function cloudSync_placeholderNextStepText(count) {
+  if (!count) return '';
+  return `有 ${count} 张大地图是占位图。下一步：进入编辑态，给占位场景绑定同尺寸本机地图，或打开云端地图库绑定 manual-maps 里的同尺寸图片。`;
+}
+function cloudSync_manualMapMatchStatus(manualMap, scene) {
+  if (!sceneNeedsLocalMap(scene)) return { status: 'none', label: '当前场景不可绑定', canBind: false };
+  const expected = scene.mapSize;
+  const actual = manualMap?.mapSize || null;
+  if (!isValidMapSize(expected)) return { status: 'unknown', label: '占位尺寸未知', canBind: false };
+  if (!isValidMapSize(actual)) return { status: 'unknown', label: '需下载后校验尺寸', canBind: true };
+  if (actual.w === expected.w && actual.h === expected.h) return { status: 'match', label: '尺寸匹配', canBind: true };
+  return { status: 'mismatch', label: `索引不匹配，需要 ${expected.w}×${expected.h}；仍可下载实测`, canBind: true };
 }
 function cloudSync_isPlaceholderMapEntry(entry) {
   return Boolean(entry && (entry.storage === 'placeholder' || entry.placeholder || entry.requires_local_file));
@@ -7393,6 +7415,46 @@ function cloudSync_isManualMapFile(entry) {
   if (!entry || entry.type !== 'file') return false;
   return /\.(png|jpe?g|webp)$/i.test(entry.name || entry.path || '');
 }
+function cloudSync_normalizeManualMapPath(path) {
+  const cleaned = String(path || '').trim().replace(/^\/+/, '');
+  if (!cleaned || /[\u0000-\u001f\u007f]/.test(cleaned)) return '';
+  const parts = cleaned.split('/');
+  if (parts.some((part) => !part || part === '.' || part === '..')) return '';
+  if (parts[0] !== CLOUD_SYNC_MANUAL_MAPS_PREFIX || parts.length < 2) return '';
+  return parts.join('/');
+}
+function cloudSync_normalizeManualMapIndexItem(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const path = cloudSync_normalizeManualMapPath(raw.path);
+  if (!path) return null;
+  if (!/\.(png|jpe?g|webp)$/i.test(path)) return null;
+  const width = Number(raw.width ?? raw.w);
+  const height = Number(raw.height ?? raw.h);
+  const mapSize = Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? { w: Math.round(width), h: Math.round(height) }
+    : null;
+  const size = Number(raw.size ?? raw.bytes ?? 0);
+  const name = String(raw.name || path.split('/').pop() || path || '地图').trim();
+  return {
+    name,
+    path,
+    size: Number.isFinite(size) && size > 0 ? size : 0,
+    sha: String(raw.sha || raw.sha256 || '').trim(),
+    mime: raw.mime || cloudSync_guessMimeFromPath(path),
+    note: String(raw.note || raw.notes || '').trim(),
+    mapSize,
+    indexed: true,
+  };
+}
+function cloudSync_parseManualMapIndex(json) {
+  const rows = Array.isArray(json) ? json : (Array.isArray(json?.maps) ? json.maps : []);
+  const byPath = new Map();
+  for (const raw of rows) {
+    const item = cloudSync_normalizeManualMapIndexItem(raw);
+    if (item) byPath.set(item.path, item);
+  }
+  return byPath;
+}
 function cloudSync_guessMimeFromPath(path) {
   const lower = String(path || '').toLowerCase();
   if (lower.endsWith('.png')) return 'image/png';
@@ -7402,15 +7464,36 @@ function cloudSync_guessMimeFromPath(path) {
 }
 async function cloudSync_listManualMaps({ owner, repo, token }) {
   const files = await cloudSync_listContents({ owner, repo, token, path: CLOUD_SYNC_MANUAL_MAPS_PREFIX, allowMissing: true });
-  return files
+  let indexByPath = new Map();
+  try {
+    const indexFile = await cloudSync_getJsonFile({ owner, repo, token, path: CLOUD_SYNC_MANUAL_MAPS_INDEX_PATH, allowMissing: true });
+    if (indexFile && indexFile.json) indexByPath = cloudSync_parseManualMapIndex(indexFile.json);
+  } catch (err) {
+    console.warn('cloudSync manual map index ignored:', err);
+  }
+  const listedPaths = new Set();
+  const fromDirectory = files
     .filter(cloudSync_isManualMapFile)
-    .map((entry) => ({
-      name: entry.name || entry.path || '地图',
-      path: entry.path,
-      size: entry.size || 0,
-      sha: entry.sha || '',
-      mime: cloudSync_guessMimeFromPath(entry.path || entry.name),
-    }))
+    .map((entry) => {
+      const indexed = indexByPath.get(entry.path);
+      const item = {
+        name: indexed?.name || entry.name || entry.path || '地图',
+        path: entry.path,
+        size: entry.size || indexed?.size || 0,
+        sha: entry.sha || indexed?.sha || '',
+        mime: cloudSync_guessMimeFromPath(entry.path || entry.name),
+        note: indexed?.note || '',
+        mapSize: indexed?.mapSize || null,
+        indexed: Boolean(indexed),
+        existsInDirectory: true,
+      };
+      listedPaths.add(item.path);
+      return item;
+    });
+  const indexOnly = [...indexByPath.values()]
+    .filter((item) => !listedPaths.has(item.path))
+    .map((item) => ({ ...item, existsInDirectory: false }));
+  return [...fromDirectory, ...indexOnly]
     .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 }
 async function cloudSync_putTextFile({ owner, repo, token, path, text, sha = null, message = null }) {
@@ -8352,8 +8435,8 @@ async function cloudSync_restoreSnapshot({ owner, repo, token, snapshotId }) {
     state.cloudSync.lastSnapshotId = manifest.snapshot_id;
     state.cloudSync.lastError = null;
     hideLoading();
-    const placeholderCount = mapSourceBySceneId.size;
-    showToast(placeholderCount ? `已读取云端进度 ✓ ${placeholderCount} 张大地图需绑定本机或云端地图` : '已读取云端进度 ✓', 5200);
+    const placeholderCount = manifest.maps.filter((item) => cloudSync_isPlaceholderMapEntry(item)).length;
+    showToast(placeholderCount ? `已读取云端进度 ✓ ${cloudSync_placeholderNextStepText(placeholderCount)}` : '已读取云端进度 ✓', 6500);
     return true;
   } catch (err) {
     hideLoading();
@@ -8514,12 +8597,12 @@ function showCloudSyncConnectForm() {
   const error = state.cloudSync.lastError;
   showModal(`
     <div class="modal-title">☁ 云存档（还没连上）</div>
-    <div class="modal-desc">把这局存到你自己的 GitHub 上，换电脑也能继续</div>
+    <div class="modal-desc">连接你的私有存档仓库。自己的电脑可用读写钥匙；朋友电脑建议用只读钥匙，只读取，不覆盖。</div>
     ${error ? `<div class="cloud-error">${escapeHtml(error.userMessage || '连接失败')}</div>` : ''}
     <div class="form-row">
-      <label for="cloud-sync-token-input">上传钥匙</label>
-      <input id="cloud-sync-token-input" type="password" autocomplete="off" placeholder="粘贴你的上传钥匙(github_pat_ 开头那串)">
-      <div class="form-note">钥匙在哪拿? 生成教程见 云同步方案.md 第十二节</div>
+      <label for="cloud-sync-token-input">云存档钥匙</label>
+      <input id="cloud-sync-token-input" type="password" autocomplete="off" placeholder="粘贴 github_pat_ 开头那串">
+      <div class="form-note">读写钥匙可上传和覆盖；只读钥匙只能读取最新进度、历史进度和云端地图库。</div>
     </div>
     <div class="form-row">
       <label class="form-check">
@@ -8546,10 +8629,12 @@ function showCloudSyncConnectForm() {
 function showCloudSyncStatusView() {
   const lastSnapshot = state.cloudSync.lastSnapshotId ? `<div class="cloud-status-row"><span>最近快照</span><span>${escapeHtml(state.cloudSync.lastSnapshotId)}</span></div>` : '';
   const lastUpload = state.cloudSync.lastUploadAt ? `<div class="cloud-status-row"><span>上次上传</span><span>${escapeHtml(cloudSync_formatTime(state.cloudSync.lastUploadAt))}</span></div>` : '';
-  const readonlyText = state.cloudSync.tokenIsReadonly ? '<div class="cloud-status-row"><span>钥匙权限</span><span>只读</span></div>' : '<div class="cloud-status-row"><span>钥匙权限</span><span>可读写</span></div>';
+  const readonlyText = state.cloudSync.tokenIsReadonly
+    ? '<div class="cloud-status-row"><span>钥匙权限</span><span>只读：能读取，不能上传覆盖</span></div>'
+    : '<div class="cloud-status-row"><span>钥匙权限</span><span>可读写：能读取，也能上传覆盖</span></div>';
   showModal(`
     <div class="modal-title">☁ 云存档</div>
-    <div class="modal-desc">${state.cloudSync.tokenIsReadonly ? '这把钥匙只有读取权限，可读取历史和最新进度，但不能上传。' : '已连接到你的私有云存档仓库。可上传当前进度、读取最新进度、查看历史。'}</div>
+    <div class="modal-desc">${state.cloudSync.tokenIsReadonly ? '这台电脑现在只能读取云端进度，适合朋友电脑或现场展示机。' : '这台电脑可以上传覆盖云端，也可以读取最新进度和历史进度。'}</div>
     <div class="cloud-status-list">
       <div class="cloud-status-row"><span>仓库</span><span>${escapeHtml(state.cloudSync.repoOwner + '/' + state.cloudSync.repoName)}</span></div>
       <div class="cloud-status-row"><span>上次连接</span><span>${escapeHtml(cloudSync_formatTime(state.cloudSync.lastConnectAt))}</span></div>
@@ -8646,19 +8731,27 @@ async function showCloudSyncManualMapLibraryModal() {
     const currentScene = state.currentSceneId ? state.scenes[state.currentSceneId] : null;
     const canBind = sceneNeedsLocalMap(currentScene);
     const desc = canBind
-      ? `当前占位场景需要 ${currentScene.mapSize.w}×${currentScene.mapSize.h} 的地图。请选择云端地图库里的同尺寸图片。`
+      ? `当前占位场景需要 ${currentScene.mapSize.w}×${currentScene.mapSize.h} 的地图。列表尺寸只是预判，点击绑定后仍会下载图片并实测尺寸。`
       : '当前场景不是待绑定占位地图。你仍可查看云端地图库，但暂时不能绑定。';
-    const rows = maps.map((item, idx) => `
+    const rows = maps.map((item, idx) => {
+      const match = cloudSync_manualMapMatchStatus(item, currentScene);
+      const sizeText = cloudSync_formatMapSize(item.mapSize);
+      const noteText = item.note ? ` · ${escapeHtml(item.note)}` : '';
+      const indexText = item.indexed ? ' · index.json' : ' · 未建索引';
+      const missingText = item.existsInDirectory === false ? ' · 文件未在目录列表出现' : '';
+      return `
       <div class="scene-row">
         <div style="flex:1;min-width:0;">
           <div class="scene-name">${escapeHtml(item.name)}</div>
-          <div class="scene-meta">${escapeHtml(item.path)} · ${cloudSync_formatBytes(item.size || 0)}</div>
+          <div class="scene-meta">${escapeHtml(item.path)} · ${sizeText} · ${cloudSync_formatBytes(item.size || 0)}${noteText}${indexText}${missingText}</div>
+          <div class="scene-meta">${escapeHtml(match.label)}</div>
         </div>
         <div class="scene-actions">
-          <button class="manual-map-bind" data-index="${idx}" ${canBind ? '' : 'disabled'}>绑定</button>
+          <button class="manual-map-bind" data-index="${idx}" ${match.canBind ? '' : 'disabled'}>绑定</button>
         </div>
       </div>
-    `).join('') || '<div class="modal-desc">`manual-maps/` 目录里还没有图片。</div>';
+    `;
+    }).join('') || '<div class="modal-desc">`manual-maps/` 目录里还没有图片。</div>';
     showModal(`
       <div class="modal-title">🗺 云端地图库</div>
       <div class="modal-desc">${escapeHtml(desc)}</div>
@@ -8827,7 +8920,7 @@ async function onClickUploadCurrent() {
   });
 }
 function onClickDownloadLatest() {
-  showConfirm('读取云端进度', '这会用云端最新快照覆盖本机当前场景。开始前会先在内存里备份当前本地进度。确定继续?', async () => {
+  showConfirm('读取云端进度', `这会用云端最新快照覆盖本机当前场景。${cloudSync_localDraftBackupText()} 确定继续?`, async () => {
     closeModal();
     try {
       await cloudSync_downloadLatest({
@@ -9712,7 +9805,11 @@ function showDropdown() {
 
     appendMenuDivider(menu);
   }
-  const cpBtn = mkMenuItem(`恢复到 Checkpoint (${state.checkpoints.length})`);
+  const latestCheckpoint = state.checkpoints.length ? state.checkpoints[state.checkpoints.length - 1] : null;
+  const checkpointAge = latestCheckpoint ? Math.max(1, Math.round((Date.now() - latestCheckpoint.ts) / 60000)) : null;
+  const cpBtn = mkMenuItem(state.checkpoints.length
+    ? `恢复迷雾 Checkpoint (${state.checkpoints.length}，最近约 ${checkpointAge} 分钟前)`
+    : '恢复迷雾 Checkpoint (0)');
   cpBtn.disabled = state.checkpoints.length === 0;
   cpBtn.addEventListener('click', () => { hideDropdown(); showCheckpointList(); });
   menu.appendChild(cpBtn);
@@ -9865,8 +9962,8 @@ function showCheckpointList() {
     return `<button class="menu-item" data-idx="${state.checkpoints.length - 1 - i}">约 ${ago} 分钟前</button>`;
   }).join('');
   showModal(`
-    <div class="modal-title">恢复到 Checkpoint</div>
-    <div class="modal-desc">选择一个时间点恢复两层迷雾。当前撤销栈会被清空。</div>
+    <div class="modal-title">恢复迷雾 Checkpoint</div>
+    <div class="modal-desc">Checkpoint 只恢复地形层和事件层迷雾，不恢复 Token、事件、标注或云端历史。恢复后当前撤销栈会清空。</div>
     <div style="display:flex;flex-direction:column;gap:6px;">${items}</div>
     <div class="modal-actions"><button id="cp-cancel">取消</button></div>
   `, {
