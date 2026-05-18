@@ -518,7 +518,7 @@ button.icon { padding: 6px 10px; }
 }
 .entry-manager-row {
   display: grid;
-  grid-template-columns: 34px 1.2fr 64px 90px 92px 72px;
+  grid-template-columns: 34px minmax(120px, 1fr) 54px minmax(112px, 0.8fr) 84px 76px 64px;
   gap: 8px;
   align-items: center;
   border: 1px solid var(--theme-border);
@@ -526,10 +526,23 @@ button.icon { padding: 6px 10px; }
   border-radius: var(--theme-radius-sm);
   padding: 8px;
 }
+.entry-manager-new-row {
+  display: grid;
+  grid-template-columns: 1fr 54px minmax(112px, 0.8fr) auto;
+  gap: 8px;
+}
 .entry-hotkey-input {
   text-transform: uppercase;
   text-align: center;
   font-weight: 700;
+}
+.entry-hotkey-action {
+  min-width: 0;
+}
+.entry-hotkey-action-badge {
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
 }
 .entry-hotkey-badge {
   display: inline-flex;
@@ -730,6 +743,9 @@ button.icon { padding: 6px 10px; }
   overflow-y: auto;
   border: 1px solid var(--theme-border);
 }
+.modal-card.entry-manager-modal {
+  max-width: min(820px, calc(100vw - 28px));
+}
 .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
 .modal-desc { font-size: 13px; color: var(--theme-text-muted); margin-bottom: 16px; }
 .modal-actions {
@@ -747,7 +763,9 @@ button.icon { padding: 6px 10px; }
 .form-row { margin-bottom: 14px; }
 .form-row label { display: block; font-size: 13px; color: var(--theme-text-muted); margin-bottom: 6px; }
 .form-row input[type="text"],
-.form-row textarea {
+.form-row textarea,
+.form-row select,
+.entry-hotkey-action {
   width: 100%;
   background: var(--theme-bg-input);
   border: 1px solid var(--theme-border);
@@ -756,6 +774,9 @@ button.icon { padding: 6px 10px; }
   color: var(--theme-text);
   font-family: inherit;
   font-size: 14px;
+}
+.form-row input[type="text"],
+.form-row textarea {
   resize: vertical;
 }
 .form-row textarea { min-height: 96px; max-height: 240px; line-height: 1.5; }
@@ -1672,6 +1693,13 @@ button.active,
     min-width: 42px;
     padding: 0 9px;
   }
+  .entry-manager-row,
+  .entry-manager-new-row {
+    grid-template-columns: 1fr;
+  }
+  .entry-manager-row .entry-color-dot {
+    display: none;
+  }
   #status-bar {
     height: 68px;
     padding: 8px;
@@ -2383,6 +2411,14 @@ function bindEntryHotkeyInput(input) {
   });
 }
 
+function normalizeEntryHotkeyAction(action) {
+  return action === 'reveal-zones' ? 'reveal-zones' : 'spotlight';
+}
+
+function entryHotkeyActionLabel(action) {
+  return normalizeEntryHotkeyAction(action) === 'reveal-zones' ? '揭示区域' : '聚光';
+}
+
 function normalizeEntryIdsForEntries(value, entries) {
   const source = Array.isArray(value) ? value : (value ? [value] : []);
   const known = new Set((entries || []).map((e) => e.id));
@@ -2434,6 +2470,7 @@ function normalizeEntries(entries) {
       id,
       name,
       hotkey,
+      hotkeyAction: normalizeEntryHotkeyAction(raw?.hotkeyAction),
       color: normalizeHex(raw?.color || ENTRY_COLORS[out.length % ENTRY_COLORS.length]),
       livePicker: raw?.livePicker !== false,
       sortOrder: Number.isFinite(raw?.sortOrder) ? raw.sortOrder : out.length,
@@ -2502,6 +2539,7 @@ function createEntry(name, opts = {}) {
     id: uuid(),
     name: cleanName,
     hotkey,
+    hotkeyAction: normalizeEntryHotkeyAction(opts.hotkeyAction),
     color: normalizeHex(opts.color || ENTRY_COLORS[(state.entries || []).length % ENTRY_COLORS.length]),
     livePicker: opts.livePicker !== false,
     sortOrder: state.entries.length,
@@ -6842,6 +6880,11 @@ function handleEntryHotkeyDown(e) {
   const entry = getEntryByHotkey(key);
   if (!entry) return false;
   if (!isEditSurface() && entry.livePicker === false) return false;
+  if (normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones') {
+    revealZonesForEntryId(entry.id);
+    e.preventDefault();
+    return true;
+  }
   setActiveEntry(state.activeEntryId === entry.id ? null : entry.id);
   showToast(state.activeEntryId ? `词条聚光：${entryDisplayName(entry)}` : `已关闭词条：${entry.name}`, 1200);
   e.preventDefault();
@@ -7025,7 +7068,8 @@ function togglePlaceEventMode(force) {
 // ============== Modal ==============
 function showModal(html, opts) {
   const root = $('modal-root');
-  root.innerHTML = '<div class="modal-card">' + html + '</div>';
+  const extraClass = opts?.className ? ` ${escapeHtml(opts.className)}` : '';
+  root.innerHTML = `<div class="modal-card${extraClass}">` + html + '</div>';
   root.classList.add('visible');
   state.uiMode = 'modal';
   if (opts && opts.onMounted) opts.onMounted(root);
@@ -7473,7 +7517,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.21.1';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.22.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -10137,6 +10181,7 @@ function openEntrySpotlightModal() {
           <span class="entry-color-dot" style="background:${escapeHtml(entry.color)}"></span>
           ${entry.hotkey ? `<span class="entry-hotkey-badge">${escapeHtml(entry.hotkey)}</span>` : ''}
           <span class="info-tag-name">${escapeHtml(entry.name)}</span>
+          ${entry.hotkey && normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones' ? '<span class="entry-hotkey-action-badge">揭示</span>' : ''}
         </span>
         <span class="info-tag-count">${canManage ? `${row.total} 项${zoneText}` : (active ? `已显露${zoneText}` : `选择${zoneText}`)}</span>
       </button>
@@ -10287,6 +10332,10 @@ function openEntryManagerModal() {
         <span class="entry-color-dot" style="background:${escapeHtml(entry.color)}"></span>
         <input class="entry-manager-name" type="text" maxlength="40" value="${escapeHtml(entry.name)}">
         <input class="entry-manager-hotkey entry-hotkey-input" type="text" maxlength="1" value="${escapeHtml(entry.hotkey || '')}" placeholder="键">
+        <select class="entry-manager-hotkey-action entry-hotkey-action">
+          <option value="spotlight"${normalizeEntryHotkeyAction(entry.hotkeyAction) === 'spotlight' ? ' selected' : ''}>聚光</option>
+          <option value="reveal-zones"${normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones' ? ' selected' : ''}>揭示区域</option>
+        </select>
         <input class="entry-manager-color" type="text" maxlength="7" value="${escapeHtml(entry.color)}">
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input class="entry-manager-live" type="checkbox"${entry.livePicker !== false ? ' checked' : ''}> 跑团</label>
         <button class="entry-manager-delete danger" type="button" ${row.total ? '' : ''}>删除</button>
@@ -10299,9 +10348,13 @@ function openEntryManagerModal() {
     <div class="entry-manager-list">${rows || '<div class="object-empty">暂无词条。可在对象编辑弹窗里新建。</div>'}</div>
     <div class="form-row" style="margin-top:10px;">
       <label>新建词条</label>
-      <div class="entry-new-row">
+      <div class="entry-manager-new-row">
         <input id="entry-manager-new-name" type="text" maxlength="40" placeholder="词条名">
         <input id="entry-manager-new-hotkey" class="entry-hotkey-input" type="text" maxlength="1" placeholder="键">
+        <select id="entry-manager-new-hotkey-action" class="entry-hotkey-action">
+          <option value="spotlight">聚光</option>
+          <option value="reveal-zones">揭示区域</option>
+        </select>
         <button id="entry-manager-new-add" type="button">新建</button>
       </div>
     </div>
@@ -10310,11 +10363,15 @@ function openEntryManagerModal() {
       <button id="entry-manager-save" class="primary">保存</button>
     </div>
   `, {
+    className: 'entry-manager-modal',
     onMounted: () => {
       bindEntryHotkeyInput($('entry-manager-new-hotkey'));
       document.querySelectorAll('.entry-manager-hotkey').forEach(bindEntryHotkeyInput);
       const addNewEntry = () => {
-        const entry = createEntry($('entry-manager-new-name').value, { hotkey: $('entry-manager-new-hotkey')?.value });
+        const entry = createEntry($('entry-manager-new-name').value, {
+          hotkey: $('entry-manager-new-hotkey')?.value,
+          hotkeyAction: $('entry-manager-new-hotkey-action')?.value,
+        });
         if (entry) { closeModal(); openEntryManagerModal(); }
       };
       $('entry-manager-new-add').addEventListener('click', () => {
@@ -10373,6 +10430,7 @@ function openEntryManagerModal() {
             entry,
             name,
             hotkey,
+            hotkeyAction: normalizeEntryHotkeyAction(row.querySelector('.entry-manager-hotkey-action')?.value),
             color: normalizeHex(row.querySelector('.entry-manager-color')?.value || entry.color),
             livePicker: !!row.querySelector('.entry-manager-live')?.checked,
             sortOrder: idx,
@@ -10382,6 +10440,7 @@ function openEntryManagerModal() {
         drafts.forEach((draft) => {
           draft.entry.name = draft.name;
           draft.entry.hotkey = draft.hotkey;
+          draft.entry.hotkeyAction = draft.hotkeyAction;
           draft.entry.color = draft.color;
           draft.entry.livePicker = draft.livePicker;
           draft.entry.sortOrder = draft.sortOrder;
