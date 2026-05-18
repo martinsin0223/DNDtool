@@ -2419,7 +2419,7 @@ function normalizeEntryHotkeyAction(action) {
 }
 
 function entryHotkeyActionLabel(action) {
-  return normalizeEntryHotkeyAction(action) === 'reveal-zones' ? '揭示区域' : '聚光';
+  return normalizeEntryHotkeyAction(action) === 'reveal-zones' ? '切换区域显示' : '聚光';
 }
 
 function normalizeEntryIdsForEntries(value, entries) {
@@ -5327,19 +5327,56 @@ function getRevealZoneLayerKeys(zone) {
   return layer === 'all' ? ['terrain', 'event'] : [layer];
 }
 
-function paintRevealZoneCells(zone) {
+function revealZoneCellEntries(zone) {
   if (!zone || !zone.cells?.length) return false;
   const grid = cloneRevealZoneGrid(zone.grid || state.grid);
+  return normalizeRevealZoneCells(zone.cells)
+    .filter((item) => item.startsWith(`${grid.type}:`))
+    .map((key) => ({ key, cell: parseGridCellKey(key), grid }))
+    .filter((item) => item.cell);
+}
+
+function revealZoneCellSamplePoints(cell, grid) {
+  const verts = gridCellVertices(cell, grid);
+  const [cx, cy] = gridCellCenter(cell, grid);
+  const points = [[cx, cy]];
+  for (const [vx, vy] of verts) points.push([cx + (vx - cx) * 0.45, cy + (vy - cy) * 0.45]);
+  return points;
+}
+
+function isRevealZoneMostlyOpen(zone) {
+  const entries = revealZoneCellEntries(zone);
+  if (!entries || !entries.length || !state.hasMap) return false;
   const layerKeys = getRevealZoneLayerKeys(zone);
+  let samples = 0;
+  let open = 0;
+  for (const { cell, grid } of entries) {
+    for (const [px, py] of revealZoneCellSamplePoints(cell, grid)) {
+      const x = Math.round(px);
+      const y = Math.round(py);
+      if (x < 0 || y < 0 || x >= state.mapCanvas.width || y >= state.mapCanvas.height) continue;
+      for (const layerKey of layerKeys) {
+        const alpha = state.fogLayers[layerKey].ctx.getImageData(x, y, 1, 1).data[3];
+        samples += 1;
+        if (alpha < 128) open += 1;
+      }
+    }
+  }
+  return samples > 0 && open / samples >= 0.8;
+}
+
+function paintRevealZoneCells(zone, mode = 'reveal') {
+  const entries = revealZoneCellEntries(zone);
+  if (!entries || !entries.length) return false;
+  const layerKeys = getRevealZoneLayerKeys(zone);
+  const paintMode = mode === 'cover' ? 'cover' : 'reveal';
   const stroke = {
     layer: normalizeRevealZoneLayer(zone.layer) === 'all' ? 'all' : normalizeRevealZoneLayer(zone.layer),
-    mode: 'reveal',
+    mode: paintMode,
     affectedTiles: new Map(),
     bounds: null,
   };
-  for (const key of normalizeRevealZoneCells(zone.cells).filter((item) => item.startsWith(`${grid.type}:`))) {
-    const cell = parseGridCellKey(key);
-    if (!cell) continue;
+  for (const { cell, grid } of entries) {
     const bounds = gridCellBounds(cell, grid);
     const minX = bounds.x, maxX = bounds.x + bounds.w;
     const minY = bounds.y, maxY = bounds.y + bounds.h;
@@ -5361,8 +5398,13 @@ function paintRevealZoneCells(zone) {
       const ctx = state.fogLayers[layerKey].ctx;
       ctx.save();
       gridCellPath(ctx, cell, grid);
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.fillStyle = '#000';
+      if (paintMode === 'reveal') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = '#000';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = layerFogColor(layerKey);
+      }
       ctx.fill();
       ctx.restore();
     }
@@ -5391,7 +5433,25 @@ function revealZoneById(zoneId) {
 function revealZonesForEntryId(entryId) {
   const zones = revealZonesForEntry(entryId);
   let count = 0;
-  for (const zone of zones) if (paintRevealZoneCells(zone)) count += 1;
+  let coverCount = 0;
+  let revealCount = 0;
+  for (const zone of zones) {
+    const mode = isRevealZoneMostlyOpen(zone) ? 'cover' : 'reveal';
+    if (paintRevealZoneCells(zone, mode)) {
+      count += 1;
+      if (mode === 'cover') coverCount += 1;
+      else revealCount += 1;
+    }
+  }
+  if (!count) showToast('当前词条没有可切换区域', 1800);
+  else if (revealCount && coverCount) showToast(`已切换 ${count} 个词条区域`, 1800);
+  else showToast(`${revealCount ? '已揭示' : '已覆盖'} ${count} 个词条区域`, 1800);
+}
+
+function revealZonesForEntryIdOnly(entryId) {
+  const zones = revealZonesForEntry(entryId);
+  let count = 0;
+  for (const zone of zones) if (paintRevealZoneCells(zone, 'reveal')) count += 1;
   if (count) showToast(`已揭示 ${count} 个词条区域`, 1800);
   else showToast('当前词条没有可揭示区域', 1800);
 }
@@ -7572,7 +7632,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.23.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.24.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -10264,7 +10324,7 @@ function openEntrySpotlightModal() {
           <span class="entry-color-dot" style="background:${escapeHtml(entry.color)}"></span>
           ${entry.hotkey ? `<span class="entry-hotkey-badge">${escapeHtml(entry.hotkey)}</span>` : ''}
           <span class="info-tag-name">${escapeHtml(entry.name)}</span>
-          ${entry.hotkey && normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones' ? '<span class="entry-hotkey-action-badge">揭示</span>' : ''}
+          ${entry.hotkey && normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones' ? '<span class="entry-hotkey-action-badge">切换</span>' : ''}
         </span>
         <span class="info-tag-count">${canManage ? `${row.total} 项${zoneText}` : (active ? `已显露${zoneText}` : `选择${zoneText}`)}</span>
       </button>
@@ -10298,7 +10358,7 @@ function openEntrySpotlightModal() {
       if (revealBtn) revealBtn.addEventListener('click', () => {
         const id = state.activeEntryId;
         closeModal();
-        revealZonesForEntryId(id);
+        revealZonesForEntryIdOnly(id);
       });
       $('entry-clear').addEventListener('click', () => { setActiveEntry(null); closeModal(); showToast('词条聚光已关闭'); });
       $('entry-close').addEventListener('click', closeModal);
@@ -10316,7 +10376,7 @@ function openRevealZoneEditor(zoneId = null) {
   const initEntryIds = editing ? editing.entryIds : [];
   showModal(`
     <div class="modal-title">${editing ? '编辑揭示区域' : '新建揭示区域'}</div>
-    <div class="modal-desc">区域按当前网格格子保存。绑定词条后，跑团时可从词条或区域列表一键揭示。</div>
+    <div class="modal-desc">区域按当前网格格子保存。绑定词条后，跑团时可从词条快捷键切换显示，或从区域列表单向揭示。</div>
     <label>名称</label>
     <input id="reveal-zone-name" type="text" maxlength="40" value="${escapeHtml(initName)}">
     <label style="margin-top:10px;">揭示目标</label>
@@ -10417,7 +10477,7 @@ function openEntryManagerModal() {
         <input class="entry-manager-hotkey entry-hotkey-input" type="text" maxlength="1" value="${escapeHtml(entry.hotkey || '')}" placeholder="键">
         <select class="entry-manager-hotkey-action entry-hotkey-action">
           <option value="spotlight"${normalizeEntryHotkeyAction(entry.hotkeyAction) === 'spotlight' ? ' selected' : ''}>聚光</option>
-          <option value="reveal-zones"${normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones' ? ' selected' : ''}>揭示区域</option>
+          <option value="reveal-zones"${normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones' ? ' selected' : ''}>切换区域显示</option>
         </select>
         <input class="entry-manager-color" type="text" maxlength="7" value="${escapeHtml(entry.color)}">
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;"><input class="entry-manager-live" type="checkbox"${entry.livePicker !== false ? ' checked' : ''}> 跑团</label>
@@ -10436,7 +10496,7 @@ function openEntryManagerModal() {
         <input id="entry-manager-new-hotkey" class="entry-hotkey-input" type="text" maxlength="1" placeholder="键">
         <select id="entry-manager-new-hotkey-action" class="entry-hotkey-action">
           <option value="spotlight">聚光</option>
-          <option value="reveal-zones">揭示区域</option>
+          <option value="reveal-zones">切换区域显示</option>
         </select>
         <button id="entry-manager-new-add" type="button">新建</button>
       </div>
