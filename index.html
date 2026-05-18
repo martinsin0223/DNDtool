@@ -5311,6 +5311,20 @@ function revealZonesForEntryId(entryId) {
 }
 
 // ============== 撤销栈（合并单栈） ==============
+// entry.type 当前清单（加新对象类型前请同步扩展 undo() 分支）：
+//   fog               迷雾 tile 操作（kind: 'tiles', layer, tiles[]）。揭示区域、全揭、笔刷、全部覆盖均走此类型。
+//   event-create      创建事件
+//   event-delete      删除事件
+//   event-modify      编辑事件（before/after 完整快照）
+//   event-move        移动事件位置（prevX/prevY）
+//   annotation-create 创建文字/图片标注
+//   annotation-delete 删除标注
+//   annotation-modify 编辑标注
+//   annotation-move   移动标注位置
+// 已知边界：
+//   - Token 当前无撤销，上传/编辑/删除/移动 Token 不入栈。如未来要加，统一用 token-create / token-modify / token-delete / token-move。
+//   - 切场景会清空 undoStack（onStrokeStart 不跨场景）。
+//   - 详细生命周期与守卫见 维护性基线.md § 2 / § 3。
 function onStrokeStart(layer, mode) {
   state.activeStroke = {
     layer, mode,
@@ -6344,6 +6358,27 @@ function positionTokenActionBar() {
 }
 
 // ============== Pointer 状态机 ==============
+// 守卫顺序（onPointerDown 入口先后过这些条件，任一命中就 return / 改 role）：
+//
+//   if state.uiMode === 'modal'                              → return（弹窗优先）
+//   if state.gridCalibration                                 → 走校准拖动（不刷雾）
+//   if state.revealZoneDraft                                 → 走选格（不刷雾、不选对象）
+//   else 命中事件/Token/标注 + isEditSurface()                → role: 'token-drag' / 'annotation-drag' / 'event-interact'
+//   else 命中事件/Token/标注 + !isEditSurface()               → role: 'token-select' / 'annotation-select' / 'event-interact'
+//   else 空白点击                                            → role: 'fog-stroke'（编辑态）或 clearSelection（跑团态）
+//
+// role 清单（onPointerMove / onPointerUp 按 role 分派）：
+//   fog-stroke           刷雾（揭/盖/全揭）。受 surfaceMode / activeLayer 影响
+//   event-interact       事件单击查看 / 编辑态拖动
+//   token-drag           编辑态拖动 Token
+//   token-select         跑团态选中 Token（不拖）
+//   annotation-drag      编辑态拖动标注
+//   annotation-select    跑团态选中标注（不拖）
+//
+// 已知边界：
+//   - Space 按下进入"安全选择层"：编辑态空格 + 点击 → 只选不刷雾；空格 + 拖动 → 平移视图。
+//   - iPad 暂无等价"安全选择"入口（见 iPad操作优化待办.md）。
+//   - 详细 surfaceMode / uiMode 边界见 维护性基线.md § 2.7 / § 2.8。
 function getCanvasOffset() {
   const rect = state.mainCanvas.getBoundingClientRect();
   return { x: rect.left, y: rect.top };
@@ -7438,7 +7473,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.20.1';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.21.1';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -10175,6 +10210,7 @@ function openRevealZoneEditor(zoneId = null) {
         const name = $('reveal-zone-name').value.trim() || '揭示区域';
         const layer = normalizeRevealZoneLayer($('reveal-zone-layer').value);
         const entryIds = getEntryIds();
+        closeModal();
         startRevealZoneDraft({ zone: editing, name, layer, entryIds });
       };
     }
