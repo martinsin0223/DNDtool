@@ -834,6 +834,154 @@ button.icon { padding: 6px 10px; }
   background: color-mix(in srgb, var(--theme-danger) 10%, transparent);
   font-size: 13px;
 }
+
+/* ============== Dice ============== */
+#btn-dice {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  z-index: 760;
+  font-size: 20px;
+  line-height: 1;
+}
+#btn-dice.active {
+  background: var(--theme-accent);
+  border-color: var(--theme-accent);
+  color: #fff;
+}
+#dice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 980;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: color-mix(in srgb, black 62%, transparent);
+  backdrop-filter: blur(3px);
+}
+#dice-overlay.visible { display: flex; }
+.dice-panel {
+  width: min(720px, calc(100vw - 28px));
+  max-height: min(760px, calc(100vh - 32px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-radius-lg);
+  background: color-mix(in srgb, var(--theme-bg-panel) 94%, black 6%);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.55);
+}
+.dice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dice-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.dice-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+}
+#dice-expression {
+  width: 100%;
+  background: var(--theme-bg-input);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-radius-sm);
+  color: var(--theme-text);
+  padding: 11px 12px;
+  font: 600 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.dice-result {
+  min-height: 72px;
+  border: 1px solid color-mix(in srgb, var(--theme-border) 80%, transparent);
+  border-radius: var(--theme-radius-md);
+  padding: 12px;
+  background: color-mix(in srgb, var(--theme-bg-input) 82%, transparent);
+}
+.dice-total {
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--theme-accent);
+}
+.dice-detail {
+  margin-top: 6px;
+  color: var(--theme-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.dice-history {
+  min-height: 120px;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding-right: 2px;
+}
+.dice-history-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--theme-border) 70%, transparent);
+  border-radius: var(--theme-radius-sm);
+  background: color-mix(in srgb, var(--theme-bg-input) 72%, transparent);
+  padding: 9px 10px;
+}
+.dice-history-row:hover {
+  background: color-mix(in srgb, var(--theme-bg-input) 58%, var(--theme-accent) 12%);
+}
+.dice-history-total {
+  min-width: 52px;
+  font-weight: 800;
+  color: var(--theme-accent);
+  font-size: 18px;
+}
+.dice-history-main { min-width: 0; }
+.dice-history-expression {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+}
+.dice-history-detail {
+  margin-top: 2px;
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dice-history-time {
+  color: var(--theme-text-muted);
+  font-size: 12px;
+}
+.dice-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--theme-text-muted);
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  #btn-dice { width: 40px; height: 40px; }
+  .dice-input-row { grid-template-columns: 1fr; }
+  .dice-panel { padding: 14px; }
+  .dice-total { font-size: 28px; }
+}
 .shape-options, .color-options {
   display: flex;
   gap: 8px;
@@ -1881,6 +2029,28 @@ button.active,
   <div id="dropdown-menu"></div>
 </div>
 <div id="modal-root"></div>
+<button id="btn-dice" title="电子骰（/）" aria-label="电子骰">🎲</button>
+<div id="dice-overlay" aria-hidden="true">
+  <div class="dice-panel" role="dialog" aria-modal="true" aria-labelledby="dice-title">
+    <div class="dice-head">
+      <div class="dice-title" id="dice-title">电子骰</div>
+      <button id="dice-close" title="关闭">关闭</button>
+    </div>
+    <div class="dice-input-row">
+      <input id="dice-expression" type="text" autocomplete="off" spellcheck="false" placeholder="2d6+5 或 d20">
+      <button id="dice-roll" class="primary">投掷</button>
+      <button id="dice-reroll">再投</button>
+    </div>
+    <div class="dice-result" id="dice-result">
+      <div class="dice-detail">输入骰子表达式后按 Enter。支持 d20、2d6+5、2d6*2+1d4。</div>
+    </div>
+    <div class="dice-history" id="dice-history"></div>
+    <div class="dice-foot">
+      <span>最近 20 条随项目保存、导出和云存档同步。</span>
+      <button id="dice-clear-history" class="danger">清空历史</button>
+    </div>
+  </div>
+</div>
 <div id="loading-overlay">
   <div class="spinner"></div>
   <div id="loading-text">加载中…</div>
@@ -1928,6 +2098,12 @@ const ANNOTATION_DEFAULT_TEXT_SIZE = 32;
 const ANNOTATION_DEFAULT_IMAGE_WIDTH = 180;
 const ANNOTATION_MIN_SIZE = 16;
 const ANNOTATION_MAX_SIZE = 1200;
+const DICE_HISTORY_LIMIT = 20;
+const DICE_MAX_TERMS = 20;
+const DICE_MAX_COUNT = 100;
+const DICE_MAX_SIDES = 1000;
+const DICE_MAX_MULTIPLIER = 10;
+const DICE_MAX_FLAT = 9999;
 
 // ============== 默认 Emoji 集（24 个，4 类） ==============
 const DEFAULT_EMOJIS = [
@@ -2023,6 +2199,9 @@ const state = {
   activeEntryId: null, // 运行态，不持久化、不导出；只控制当前现场聚光
   revealZones: [],
   revealZoneDraft: null,
+  diceHistory: [],
+  diceLastExpression: 'd20',
+  dicePanelOpen: false,
   // 撤销栈（合并：fog + event 操作）
   undoStack: [],
   checkpoints: [],
@@ -2255,6 +2434,187 @@ function setStatusSaved(msg) {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+function normalizeDiceExpression(value) {
+  return String(value || '').replace(/\s+/g, '').replace(/x/gi, '*').toLowerCase();
+}
+
+function normalizeDiceHistoryItem(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const expression = normalizeDiceExpression(raw.expression);
+  if (!expression) return null;
+  const total = Number(raw.total);
+  if (!Number.isFinite(total)) return null;
+  return {
+    id: String(raw.id || uuid()),
+    expression: expression.slice(0, 120),
+    total: Math.round(total),
+    detail: String(raw.detail || '').slice(0, 600),
+    createdAt: Number.isFinite(raw.createdAt) ? raw.createdAt : Date.now(),
+  };
+}
+
+function normalizeDiceHistory(value) {
+  return (Array.isArray(value) ? value : [])
+    .map(normalizeDiceHistoryItem)
+    .filter(Boolean)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, DICE_HISTORY_LIMIT);
+}
+
+function serializeDiceHistory() {
+  return normalizeDiceHistory(state.diceHistory);
+}
+
+function diceRandomInt(maxInclusive) {
+  const max = Math.floor(maxInclusive);
+  if (!Number.isFinite(max) || max < 1) throw new Error('骰面不正确');
+  const range = 0x100000000;
+  const limit = range - (range % max);
+  const buf = new Uint32Array(1);
+  do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+  return (buf[0] % max) + 1;
+}
+
+function parseDiceExpression(raw) {
+  const expression = normalizeDiceExpression(raw);
+  if (!expression) throw new Error('请输入骰子表达式');
+  if (!/^[0-9d+*]+$/.test(expression)) throw new Error('只支持数字、d、+、*');
+  const terms = expression.split('+');
+  if (!terms.length || terms.length > DICE_MAX_TERMS) throw new Error(`最多支持 ${DICE_MAX_TERMS} 项`);
+  return terms.map((term) => {
+    if (!term) throw new Error('表达式不完整');
+    const parts = term.split('*');
+    if (parts.length > 2) throw new Error('每项最多一个倍率');
+    const base = parts[0];
+    const multiplier = parts[1] == null ? 1 : Number(parts[1]);
+    if (!Number.isInteger(multiplier) || multiplier < 1 || multiplier > DICE_MAX_MULTIPLIER) throw new Error(`倍率必须是 1-${DICE_MAX_MULTIPLIER} 的整数`);
+    const diceMatch = base.match(/^(\d*)d(\d+)$/);
+    if (diceMatch) {
+      const count = diceMatch[1] ? Number(diceMatch[1]) : 1;
+      const sides = Number(diceMatch[2]);
+      if (!Number.isInteger(count) || count < 1 || count > DICE_MAX_COUNT) throw new Error(`骰子数量必须是 1-${DICE_MAX_COUNT}`);
+      if (!Number.isInteger(sides) || sides < 2 || sides > DICE_MAX_SIDES) throw new Error(`骰面必须是 2-${DICE_MAX_SIDES}`);
+      return { type: 'dice', count, sides, multiplier };
+    }
+    if (!/^\d+$/.test(base)) throw new Error(`无法识别：${term}`);
+    const value = Number(base);
+    if (!Number.isInteger(value) || value > DICE_MAX_FLAT) throw new Error(`固定加值最大 ${DICE_MAX_FLAT}`);
+    if (multiplier !== 1) throw new Error('固定加值不支持倍率');
+    return { type: 'flat', value, multiplier: 1 };
+  });
+}
+
+function rollDiceExpression(raw) {
+  const terms = parseDiceExpression(raw);
+  let total = 0;
+  const details = [];
+  for (const term of terms) {
+    if (term.type === 'flat') {
+      total += term.value;
+      details.push(`+${term.value}`);
+      continue;
+    }
+    const rolls = [];
+    for (let i = 0; i < term.count; i++) rolls.push(diceRandomInt(term.sides));
+    const subtotal = rolls.reduce((sum, n) => sum + n, 0);
+    const final = subtotal * term.multiplier;
+    total += final;
+    const multText = term.multiplier > 1 ? ` ×${term.multiplier} 暴击翻倍 = ${final}` : ` = ${final}`;
+    details.push(`${term.count}d${term.sides} [${rolls.join(', ')}]${multText}`);
+  }
+  return { id: uuid(), expression: normalizeDiceExpression(raw), total, detail: details.join('；'), createdAt: Date.now() };
+}
+
+function renderDiceResult(item, error = '') {
+  const box = $('dice-result');
+  if (!box) return;
+  if (error) {
+    box.innerHTML = `<div class="dice-detail" style="color:var(--theme-danger);">${escapeHtml(error)}</div>`;
+    return;
+  }
+  if (!item) {
+    box.innerHTML = '<div class="dice-detail">输入骰子表达式后按 Enter。支持 d20、2d6+5、2d6*2+1d4。</div>';
+    return;
+  }
+  box.innerHTML = `<div class="dice-total">${item.total}</div><div class="dice-detail">${escapeHtml(item.expression)} · ${escapeHtml(item.detail)}</div>`;
+}
+
+function renderDiceHistory() {
+  const list = $('dice-history');
+  if (!list) return;
+  state.diceHistory = normalizeDiceHistory(state.diceHistory);
+  if (!state.diceHistory.length) {
+    list.innerHTML = '<div class="dice-detail">暂无历史。</div>';
+    return;
+  }
+  list.innerHTML = state.diceHistory.map((item) => `
+    <button class="dice-history-row" data-dice-id="${escapeHtml(item.id)}" title="点击填入表达式">
+      <span class="dice-history-total">${item.total}</span>
+      <span class="dice-history-main">
+        <span class="dice-history-expression">${escapeHtml(item.expression)}</span>
+        <span class="dice-history-detail">${escapeHtml(item.detail)}</span>
+      </span>
+      <span class="dice-history-time">${new Date(item.createdAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' })}</span>
+    </button>
+  `).join('');
+  list.querySelectorAll('.dice-history-row').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const item = state.diceHistory.find((x) => x.id === btn.dataset.diceId);
+      if (!item) return;
+      $('dice-expression').value = item.expression;
+      $('dice-expression').focus();
+      $('dice-expression').select();
+    });
+  });
+}
+
+function addDiceHistory(item) {
+  state.diceHistory = normalizeDiceHistory([item, ...(state.diceHistory || [])]);
+  state.diceLastExpression = item.expression;
+  renderDiceResult(item);
+  renderDiceHistory();
+  triggerImmediateSave();
+}
+
+function rollDiceFromInput(opts = {}) {
+  const input = $('dice-expression');
+  const expression = normalizeDiceExpression(opts.expression || input?.value || state.diceLastExpression || 'd20');
+  try {
+    const item = rollDiceExpression(expression);
+    if (input) input.value = item.expression;
+    addDiceHistory(item);
+  } catch (e) {
+    renderDiceResult(null, e.message || String(e));
+  }
+}
+
+function openDicePanel() {
+  state.dicePanelOpen = true;
+  const overlay = $('dice-overlay');
+  overlay.classList.add('visible');
+  overlay.setAttribute('aria-hidden', 'false');
+  $('btn-dice')?.classList.add('active');
+  renderDiceResult(state.diceHistory?.[0] || null);
+  renderDiceHistory();
+  const input = $('dice-expression');
+  input.value = state.diceLastExpression || state.diceHistory?.[0]?.expression || 'd20';
+  setTimeout(() => { input.focus(); input.select(); }, 0);
+}
+
+function closeDicePanel() {
+  state.dicePanelOpen = false;
+  const overlay = $('dice-overlay');
+  overlay.classList.remove('visible');
+  overlay.setAttribute('aria-hidden', 'true');
+  $('btn-dice')?.classList.remove('active');
+}
+
+function toggleDicePanel() {
+  if (state.dicePanelOpen) closeDicePanel();
+  else openDicePanel();
+}
+
 const DEFAULT_CHAPTER_NUMBER = '第 1 章';
 const DEFAULT_CHAPTER_TITLE = '';
 function normalizeChapterNumber(value) {
@@ -3456,8 +3816,7 @@ async function syncActiveSceneToMemory() {
 
 async function doSaveMain() {
   if (!state.dbReady) return;
-  if (!state.currentSceneId) return;  // 没场景就不写
-  if (state.hasMap) {
+  if (state.hasMap && state.currentSceneId) {
     // 把当前 active state 写到 state.scenes[currentSceneId]
     const ok = await syncActiveSceneToMemory();
     if (!ok) return;
@@ -3467,6 +3826,7 @@ async function doSaveMain() {
     version: SCHEMA_VERSION,
     scenes: state.scenes,
     currentSceneId: state.currentSceneId,
+    diceHistory: serializeDiceHistory(),
     themeId: 'default-dark',
     customTheme: isDefault ? null : state.theme,
     ts: Date.now(),
@@ -3621,6 +3981,7 @@ async function exportProject() {
       exportedAt: new Date().toISOString(),
       sceneCount: scenes.length,
       currentSceneId: state.currentSceneId,
+      diceHistory: serializeDiceHistory(),
       scenes,
       themeId: 'default-dark',
       customTheme: isDefaultTheme ? null : state.theme,
@@ -3801,6 +4162,9 @@ async function doImportSceneBundle(payload, selectedFiles) {
         else applyTheme(DEFAULT_DARK_THEME);
       } catch (e) { console.warn('导入主题失败', e); }
     }
+    state.diceHistory = normalizeDiceHistory(payload.diceHistory || []);
+    state.diceLastExpression = state.diceHistory[0]?.expression || 'd20';
+    renderDiceHistory();
     await saveMainStrict();
     hideLoading();
     showToast(`已导入 ${preparedEntries.length} 个场景`, 3500);
@@ -7007,6 +7371,10 @@ function handleEntryHotkeyDown(e) {
 }
 
 function onKeyDown(e) {
+  if (state.dicePanelOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closeDicePanel(); }
+    return;
+  }
   if (state.gridCalibration && e.key === 'Escape') {
     finishGridCalibration(false);
     e.preventDefault();
@@ -7024,6 +7392,11 @@ function onKeyDown(e) {
   }
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    openDicePanel();
+    return;
+  }
   if (state.gridCalibration) {
     e.preventDefault();
     return;
@@ -7632,7 +8005,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.24.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.25.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -8214,6 +8587,7 @@ async function cloudSync_serializeStateBundle(opts = {}) {
     exportedAt: new Date().toISOString(),
     sceneCount: scenes.length,
     currentSceneId: state.currentSceneId,
+    diceHistory: serializeDiceHistory(),
     scenes,
     themeId: 'default-dark',
     customTheme: isDefaultTheme ? null : state.theme,
@@ -8436,6 +8810,9 @@ async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
       console.warn('恢复主题失败', e);
     }
   }
+  state.diceHistory = normalizeDiceHistory(bundleJson.diceHistory || []);
+  state.diceLastExpression = state.diceHistory[0]?.expression || 'd20';
+  renderDiceHistory();
   await saveMainStrict();
 }
 function cloudSync_generateSnapshotId() {
@@ -10964,6 +11341,9 @@ async function tryAutoLoadCurrentScene() {
   if (!main) return;
   state.scenes = main.scenes || {};
   state.currentSceneId = main.currentSceneId || null;
+  state.diceHistory = normalizeDiceHistory(main.diceHistory || []);
+  state.diceLastExpression = state.diceHistory[0]?.expression || 'd20';
+  renderDiceHistory();
   if (main.customTheme) {
     try { loadCustomTheme(main.customTheme); } catch (_) {}
   }
@@ -11152,6 +11532,33 @@ function setupEventListeners() {
   $('btn-surface-toggle').addEventListener('click', () => setSurfaceMode(isEditSurface() ? 'live' : 'edit'));
   $('btn-entry-spotlight').addEventListener('click', openEntrySpotlightModal);
   $('btn-edit-chapter').addEventListener('click', openChapterModal);
+  $('btn-dice').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleDicePanel();
+  });
+  $('dice-close').addEventListener('click', closeDicePanel);
+  $('dice-roll').addEventListener('click', () => rollDiceFromInput());
+  $('dice-reroll').addEventListener('click', () => rollDiceFromInput({ expression: state.diceLastExpression }));
+  $('dice-clear-history').addEventListener('click', () => {
+    state.diceHistory = [];
+    state.diceLastExpression = 'd20';
+    renderDiceResult(null);
+    renderDiceHistory();
+    triggerImmediateSave();
+  });
+  $('dice-expression').addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      rollDiceFromInput();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeDicePanel();
+    }
+  });
+  $('dice-overlay').addEventListener('pointerdown', (e) => {
+    if (e.target === $('dice-overlay')) closeDicePanel();
+  });
 
   $('btn-more').addEventListener('click', (e) => {
     e.stopPropagation();
