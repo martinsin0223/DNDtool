@@ -9,24 +9,24 @@
 <style>
 /* ============== Theme tokens ============== */
 :root {
-  --theme-bg: #0a0a0a;
-  --theme-bg-panel: #1a1a1a;
+  --theme-bg: var(--t-bg);
+  --theme-bg-panel: var(--t-surface);
   --theme-panel-blur-alpha: 0.85;
-  --theme-bg-input: #27272a;
-  --theme-border: #3f3f46;
-  --theme-text: #e4e4e7;
-  --theme-text-muted: #71717a;
-  --theme-accent: #3b82f6;
-  --theme-danger: #ef4444;
-  --theme-warn: #facc15;
+  --theme-bg-input: var(--t-surface-raised);
+  --theme-border: var(--t-border);
+  --theme-text: var(--t-text);
+  --theme-text-muted: var(--t-text-muted);
+  --theme-accent: var(--t-accent);
+  --theme-danger: var(--t-danger);
+  --theme-warn: var(--t-warn);
   --theme-shadow-color: rgba(0,0,0,0.4);
   --theme-shadow-spread: 0 4px 16px;
   --theme-radius-sm: 4px;
   --theme-radius-md: 8px;
   --theme-radius-lg: 12px;
   --theme-font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --theme-splash-text: #52525b;
-  --theme-loading-spinner: #3b82f6;
+  --theme-splash-text: var(--t-text-muted);
+  --theme-loading-spinner: var(--t-accent);
   color-scheme: dark;
 }
 
@@ -1256,694 +1256,519 @@ input[type="number"] {
     bottom: 8px;
   }
 }
-/* ============== v3.8 visual shell: pure CSS brass console ============== */
-:root {
-  --art-bg: #030201;
-  --art-obsidian: #070604;
-  --art-top: #120d08;
-  --art-top-deep: #090705;
-  --art-walnut: #24170d;
-  --art-walnut-deep: #110b07;
-  --art-brass-hi: #d6b06a;
-  --art-brass: #9d7539;
-  --art-brass-dim: #5b4325;
-  --art-brass-dark: #25190d;
-  --art-ivory: #f1dfbd;
-  --art-muted: #9f8b66;
-  --art-red: #9b2d2d;
-  --art-panel: #15100b;
-  --art-panel-2: #21160f;
-  --art-glow: rgba(214,176,106,0.28);
+/* ============== Theme System ============== */
+
+/* 默认主题 = stone */
+:root,
+[data-theme="stone"] {
+  --t-bg: #1a1816;
+  --t-surface: #211f1c;
+  --t-surface-raised: #2a2724;
+  --t-surface-hover: #322f2b;
+  --t-border: #332f2a;
+  --t-border-subtle: rgba(255,255,255,0.04);
+  --t-text: #d8d0c4;
+  --t-text-secondary: #9c9283;
+  --t-text-muted: #6b6157;
+  --t-accent: #e8943a;
+  --t-accent-text: #1a1210;
+  --t-accent-soft: rgba(232,148,58,0.14);
+  --t-accent-glow: rgba(232,148,58,0.25);
+  --t-danger: #d4493a;
+  --t-warn: #e8943a;
+  --t-icon-color: #e8943a;
+  --t-icon-glow: drop-shadow(0 0 4px rgba(232,148,58,0.2));
+  --t-active-bg: #e8943a;
+  --t-active-text: #1a1210;
+  --t-active-shadow: 0 0 20px rgba(232,148,58,0.25), 0 2px 8px rgba(0,0,0,0.3);
+  --t-map-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.3);
+  --t-panel-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  --t-grain: 1;  /* 1=有噪点, 0=无噪点 */
+  --t-grain-opacity: 0.35;
+  --t-grain-blend: overlay;
+  --t-grain-frequency: 0.85;
+  --t-canvas-bg: #141210;
+  --t-toolbar-bg: var(--t-surface);
+  --t-statusbar-bg: #131110;
+  --t-btn-radius: 8px;
+  --t-panel-radius: 12px;
 }
+
+[data-theme="ink-gold"] {
+  --t-bg: #050505;
+  --t-surface: #0a0a08;
+  --t-surface-raised: #121210;
+  --t-surface-hover: #1a1a16;
+  --t-border: rgba(201,168,76,0.12);
+  --t-border-subtle: rgba(201,168,76,0.08);
+  --t-text: #c9a84c;
+  --t-text-secondary: #5a5345;
+  --t-text-muted: #3d3828;
+  --t-accent: #c9a84c;
+  --t-accent-text: #050505;
+  --t-accent-soft: rgba(201,168,76,0.06);
+  --t-accent-glow: rgba(201,168,76,0.15);
+  --t-danger: #c44030;
+  --t-warn: #c9a84c;
+  --t-icon-color: #c9a84c;
+  --t-icon-glow: none;
+  --t-active-bg: transparent;
+  --t-active-text: #c9a84c;
+  --t-active-shadow: 0 1px 0 #c9a84c;
+  --t-active-border-bottom: 2px solid #c9a84c;
+  --t-map-shadow: 0 0 0 1px rgba(201,168,76,0.15), 0 24px 64px rgba(0,0,0,0.7);
+  --t-panel-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  --t-grain: 0;
+  --t-grain-opacity: 0;
+  --t-canvas-bg: #030303;
+  --t-toolbar-bg: transparent;
+  --t-statusbar-bg: transparent;
+  --t-btn-radius: 0px;
+  --t-panel-radius: 2px;
+}
+
+[data-theme="parchment"] {
+  --t-bg: #ece2d0;
+  --t-surface: rgba(230,218,195,0.85);
+  --t-surface-raised: rgba(220,208,186,0.9);
+  --t-surface-hover: rgba(210,198,176,0.9);
+  --t-border: #c8b898;
+  --t-border-subtle: #d8ccb4;
+  --t-text: #5a3a24;
+  --t-text-secondary: #7a6548;
+  --t-text-muted: #a08868;
+  --t-accent: #6b3a2a;
+  --t-accent-text: #f0e8d8;
+  --t-accent-soft: rgba(107,58,42,0.08);
+  --t-accent-glow: rgba(107,58,42,0.2);
+  --t-danger: #8b2a1a;
+  --t-warn: #8b5a24;
+  --t-icon-color: #8b3a24;
+  --t-icon-glow: none;
+  --t-active-bg: #6b3a2a;
+  --t-active-text: #f0e8d8;
+  --t-active-shadow: 0 2px 8px rgba(107,58,42,0.3);
+  --t-map-shadow: 0 4px 20px rgba(80,50,20,0.25), 0 16px 48px rgba(80,50,20,0.15);
+  --t-panel-shadow: 0 8px 24px rgba(80,50,20,0.15);
+  --t-grain: 1;
+  --t-grain-opacity: 0.45;
+  --t-grain-blend: multiply;
+  --t-grain-frequency: 1.2;
+  --t-canvas-bg: #d8ccb4;
+  --t-toolbar-bg: var(--t-surface);
+  --t-statusbar-bg: rgba(220,208,186,0.7);
+  --t-btn-radius: 6px;
+  --t-panel-radius: 12px;
+  color-scheme: light;
+}
+
+[data-theme="blueprint"] {
+  --t-bg: #0e1a28;
+  --t-surface: #101e2e;
+  --t-surface-raised: #162840;
+  --t-surface-hover: #1c3050;
+  --t-border: rgba(91,155,213,0.12);
+  --t-border-subtle: rgba(91,155,213,0.06);
+  --t-text: #8ab8e0;
+  --t-text-secondary: #4a6a88;
+  --t-text-muted: #2a4058;
+  --t-accent: #d4a03a;
+  --t-accent-text: #0e1420;
+  --t-accent-soft: rgba(212,160,58,0.1);
+  --t-accent-glow: rgba(212,160,58,0.2);
+  --t-danger: #c44030;
+  --t-warn: #d4a03a;
+  --t-icon-color: #d4a03a;
+  --t-icon-glow: drop-shadow(0 0 3px rgba(212,160,58,0.15));
+  --t-active-bg: #d4a03a;
+  --t-active-text: #0e1420;
+  --t-active-shadow: 0 0 16px rgba(212,160,58,0.2), 0 2px 8px rgba(0,0,0,0.3);
+  --t-map-shadow: 0 0 0 1px rgba(91,155,213,0.12), 0 20px 56px rgba(0,0,0,0.5);
+  --t-panel-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  --t-grain: 0;
+  --t-grain-opacity: 0;
+  --t-canvas-bg: #0a1420;
+  --t-toolbar-bg: var(--t-surface);
+  --t-statusbar-bg: #0a1218;
+  --t-btn-radius: 6px;
+  --t-panel-radius: 12px;
+  /* 特殊: 网格暗纹, 见下方 canvas 样式 */
+}
+
+[data-theme="theater"] {
+  --t-bg: #110b0d;
+  --t-surface: #1a0f11;
+  --t-surface-raised: #261418;
+  --t-surface-hover: #30191e;
+  --t-border: rgba(160,80,80,0.15);
+  --t-border-subtle: rgba(160,80,80,0.08);
+  --t-text: #c4a088;
+  --t-text-secondary: #7a5555;
+  --t-text-muted: #5a3838;
+  --t-accent: #c46838;
+  --t-accent-text: #f8e8d8;
+  --t-accent-soft: rgba(180,70,50,0.1);
+  --t-accent-glow: rgba(180,70,50,0.2);
+  --t-danger: #c44030;
+  --t-warn: #c4956a;
+  --t-icon-color: #c4956a;
+  --t-icon-glow: drop-shadow(0 0 3px rgba(196,149,106,0.15));
+  --t-active-bg: linear-gradient(135deg, #a04030, #c46838);
+  --t-active-text: #f8e8d8;
+  --t-active-shadow: 0 0 24px rgba(180,70,50,0.2), 0 2px 8px rgba(0,0,0,0.4);
+  --t-map-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 80px rgba(80,20,20,0.08);
+  --t-panel-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  --t-grain: 1;
+  --t-grain-opacity: 0.3;
+  --t-grain-blend: overlay;
+  --t-grain-frequency: 0.9;
+  --t-canvas-bg: #0a0708;
+  --t-toolbar-bg: #1a0f11;
+  --t-statusbar-bg: #0d0809;
+  --t-btn-radius: 8px;
+  --t-panel-radius: 12px;
+}
+
+[data-theme="forest"] {
+  --t-bg: #0e1610;
+  --t-surface: #121c14;
+  --t-surface-raised: #1a2a1e;
+  --t-surface-hover: #223528;
+  --t-border: rgba(107,186,122,0.1);
+  --t-border-subtle: rgba(107,186,122,0.05);
+  --t-text: #8ad098;
+  --t-text-secondary: #4a7a50;
+  --t-text-muted: #3a5840;
+  --t-accent: #d4a03a;
+  --t-accent-text: #0e1610;
+  --t-accent-soft: rgba(212,160,58,0.1);
+  --t-accent-glow: rgba(212,160,58,0.22);
+  --t-danger: #c44030;
+  --t-warn: #d4a03a;
+  --t-icon-color: #d4a03a;
+  --t-icon-glow: drop-shadow(0 0 4px rgba(212,160,58,0.18));
+  --t-active-bg: #d4a03a;
+  --t-active-text: #0e1610;
+  --t-active-shadow: 0 0 18px rgba(212,160,58,0.22), 0 2px 8px rgba(0,0,0,0.3);
+  --t-map-shadow: 0 20px 56px rgba(0,0,0,0.5), 0 0 40px rgba(40,80,50,0.08);
+  --t-panel-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  --t-grain: 1;
+  --t-grain-opacity: 0.3;
+  --t-grain-blend: overlay;
+  --t-grain-frequency: 0.7;
+  --t-canvas-bg: #0a120c;
+  --t-toolbar-bg: var(--t-surface);
+  --t-statusbar-bg: #090f0a;
+  --t-btn-radius: 10px;
+  --t-panel-radius: 12px;
+}
+
+/* ============== Theme Application ============== */
+
 body {
-  background: #030201;
-  color: var(--art-ivory);
+  background: var(--t-bg);
+  color: var(--t-text);
 }
-#app {
-  background:
-    radial-gradient(circle at 50% 44%, rgba(154,113,49,0.08), transparent 35%),
-    linear-gradient(180deg, #070604 0%, #020201 100%);
-}
-#toolbar {
-  min-height: 70px;
-  padding: 10px 12px;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(214,176,106,0.13), transparent 18%),
-    radial-gradient(circle at 82% 0%, rgba(214,176,106,0.10), transparent 22%),
-    linear-gradient(180deg, rgba(255,235,186,0.08) 0%, transparent 18%),
-    repeating-linear-gradient(90deg, rgba(214,176,106,0.08) 0 1px, transparent 1px 19px),
-    repeating-linear-gradient(0deg, rgba(255,245,210,0.025) 0 1px, transparent 1px 8px),
-    linear-gradient(180deg, #1a120b 0%, #100b07 54%, #070504 100%);
-  border-bottom: 1px solid rgba(157,117,57,0.72);
-  box-shadow:
-    inset 0 1px rgba(255,232,178,0.22),
-    inset 0 -1px rgba(0,0,0,0.8),
-    0 8px 24px rgba(0,0,0,0.52);
-  scrollbar-width: none;
-}
-#toolbar::-webkit-scrollbar { display: none; }
-#toolbar::after {
+
+/* 噪点纹理层 — 通过 --t-grain 控制显隐 */
+#app::after {
   content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -2px;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(214,176,106,0.58), transparent);
+  position: fixed;
+  inset: 0;
   pointer-events: none;
+  z-index: 9999;
+  opacity: var(--t-grain-opacity, 0);
+  mix-blend-mode: var(--t-grain-blend, overlay);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
 }
-.toolbar-group {
-  gap: 8px;
-  padding: 0 2px;
-  flex: 0 0 auto;
+
+/* 工具栏 */
+#toolbar {
+  background: var(--t-toolbar-bg);
+  border-bottom-color: var(--t-border-subtle);
+  box-shadow: none;
 }
-.toolbar-label {
-  color: var(--art-muted);
-  font-size: 12px;
-  letter-spacing: 0;
-}
+#toolbar::after { display: none; }
+
+/* 工具栏分隔线 */
 .toolbar-divider {
-  width: 2px;
-  height: 52px;
-  margin: 0 2px;
-  background:
-    linear-gradient(180deg, transparent, rgba(214,176,106,0.82) 14%, rgba(52,35,17,0.9) 50%, rgba(214,176,106,0.72) 86%, transparent),
-    linear-gradient(90deg, transparent, rgba(255,234,177,0.18), transparent);
-  box-shadow:
-    -1px 0 rgba(0,0,0,0.65),
-    1px 0 rgba(255,228,169,0.09);
+  background: var(--t-border-subtle) !important;
+  box-shadow: none !important;
+  height: 24px !important;
+  width: 1px !important;
 }
+
+/* 按钮通用 */
 button,
-#toolbar button,
-#toolbar input[type="number"],
-#toolbar select,
-.object-filter {
-  border-radius: 6px;
-}
 #toolbar button,
 .top-command,
 .object-filter,
 .modal-actions button,
 #dropdown-menu button,
 #token-action-bar button,
-#annotation-action-bar button,
-#object-panel-live {
-  position: relative;
-  color: var(--art-ivory);
-  font-weight: 620;
-  background:
-    linear-gradient(180deg, rgba(255,239,199,0.08), transparent 31%),
-    linear-gradient(180deg, #24180f 0%, #15100b 52%, #090705 100%);
-  border: 1px solid rgba(157,117,57,0.68);
-  box-shadow:
-    inset 0 0 0 1px rgba(0,0,0,0.62),
-    inset 0 1px rgba(255,238,190,0.16),
-    inset 0 -10px 16px rgba(0,0,0,0.24),
-    0 1px 0 rgba(255,234,177,0.10),
-    0 4px 10px rgba(0,0,0,0.30);
-  text-shadow: 0 1px 1px rgba(0,0,0,0.8);
+#annotation-action-bar button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--t-btn-radius);
+  color: var(--t-text-secondary);
+  box-shadow: none;
+  text-shadow: none;
+  font-weight: 500;
 }
-#toolbar button {
-  min-height: 46px;
-  padding: 0 14px;
-  gap: 9px;
-  font-size: 15px;
-  line-height: 1;
-}
+
+button:hover,
 #toolbar button:hover,
 .top-command:hover,
 .object-filter:hover,
 .modal-actions button:hover,
-#dropdown-menu button:hover,
-#token-action-bar button:hover,
-#annotation-action-bar button:hover,
-#object-panel-live:hover {
-  background:
-    linear-gradient(180deg, rgba(255,239,199,0.15), transparent 35%),
-    linear-gradient(180deg, #302114 0%, #1a120b 52%, #0a0705 100%);
-  border-color: rgba(214,176,106,0.90);
-  box-shadow:
-    inset 0 0 0 1px rgba(0,0,0,0.58),
-    inset 0 1px rgba(255,238,190,0.25),
-    0 0 16px rgba(214,176,106,0.16);
+#dropdown-menu button:hover {
+  background: var(--t-surface-raised);
+  border-color: transparent;
+  color: var(--t-text);
+  box-shadow: none;
 }
+
+/* 按钮激活态 */
 #toolbar button.active,
 button.active,
 #app.surface-edit #btn-surface-toggle,
 .object-filter.active {
-  color: #fff5d6;
-  border-color: rgba(235,199,121,0.98);
-  background:
-    linear-gradient(180deg, rgba(255,242,201,0.20), transparent 35%),
-    linear-gradient(180deg, #3a2917 0%, #21160d 54%, #0c0805 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(0,0,0,0.62),
-    inset 0 0 16px rgba(214,176,106,0.16),
-    0 0 16px rgba(214,176,106,0.18);
+  background: var(--t-active-bg);
+  color: var(--t-active-text);
+  border-color: transparent;
+  font-weight: 650;
+  box-shadow: var(--t-active-shadow);
+  text-shadow: none;
 }
+
+/* ink-gold 主题的特殊激活态 (下划线) */
+[data-theme="ink-gold"] #toolbar button.active,
+[data-theme="ink-gold"] button.active {
+  background: transparent;
+  border-bottom: 2px solid var(--t-accent);
+  border-radius: 0;
+}
+
+/* theater 主题的渐变激活态 */
+[data-theme="theater"] #toolbar button.active,
+[data-theme="theater"] button.active,
+[data-theme="theater"] #app.surface-edit #btn-surface-toggle,
+[data-theme="theater"] .object-filter.active {
+  background: linear-gradient(135deg, #a04030, #c46838);
+}
+
+/* 按钮禁用态 */
 #toolbar button:disabled {
-  color: rgba(159,139,102,0.62);
-  border-color: rgba(91,67,37,0.48);
-  opacity: 0.72;
+  color: var(--t-text-muted);
+  opacity: 0.5;
+  border-color: transparent;
 }
+
+/* 图标颜色 */
 .nav-ico {
-  color: var(--art-brass-hi);
-  font-size: 15px;
-  line-height: 1;
+  color: var(--t-icon-color);
+  filter: var(--t-icon-glow);
 }
-#brush-size-input {
-  width: 74px;
-  min-height: 46px;
-  color: var(--art-ivory);
-  background:
-    linear-gradient(180deg, rgba(255,239,199,0.05), transparent 35%),
-    linear-gradient(180deg, #1c130b, #0b0704);
-  border: 1px solid rgba(157,117,57,0.64);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.65);
-  font-weight: 700;
+button.active .nav-ico,
+#app.surface-edit #btn-surface-toggle .nav-ico {
+  color: var(--t-active-text);
+  filter: none;
 }
+
+/* 画布区域 */
 #canvas-container {
+  background: var(--t-canvas-bg);
+  border-left: none;
+  border-right: none;
+}
+#canvas-container::after { display: none; }
+
+/* blueprint 主题的网格暗纹 */
+[data-theme="blueprint"] #canvas-container {
   background:
-    radial-gradient(circle at 50% 45%, rgba(214,176,106,0.10), transparent 26%),
-    radial-gradient(circle at 50% 48%, rgba(255,242,197,0.035), transparent 19%),
-    repeating-linear-gradient(35deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 16px),
-    linear-gradient(180deg, #080706, #020202);
-  border-left: 1px solid rgba(157,117,57,0.58);
-  border-right: 1px solid rgba(157,117,57,0.58);
+    repeating-linear-gradient(0deg, rgba(91,155,213,0.06) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(91,155,213,0.06) 0 1px, transparent 1px 40px),
+    var(--t-canvas-bg);
 }
-#canvas-container::after {
-  content: '';
-  position: absolute;
-  inset: 8px;
-  border: 1px solid rgba(157,117,57,0.72);
-  box-shadow:
-    inset 0 0 0 1px rgba(0,0,0,0.75),
-    inset 0 0 70px rgba(0,0,0,0.54);
-  pointer-events: none;
-  z-index: 2;
+
+/* theater 主题的顶部红光 */
+[data-theme="theater"] #canvas-container {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(80,20,20,0.15), transparent 50%),
+    var(--t-canvas-bg);
 }
-#main { z-index: 1; }
+
+/* Splash 页面 */
 #splash {
-  color: var(--art-ivory);
-  text-shadow: 0 2px 8px rgba(0,0,0,0.86);
+  color: var(--t-text-muted);
+  text-shadow: none;
 }
 #splash h1 {
-  color: var(--art-ivory);
-  font-weight: 520;
+  color: var(--t-text-muted);
+  font-weight: 300;
+  letter-spacing: 4px;
 }
 #splash h1::after {
-  content: '';
-  display: block;
-  width: 204px;
-  height: 13px;
-  margin: 8px auto 0;
-  background:
-    radial-gradient(circle at 50% 50%, var(--art-brass-hi) 0 3px, transparent 4px),
-    linear-gradient(90deg, transparent, var(--art-brass-hi), transparent);
-  opacity: 0.78;
+  background: linear-gradient(90deg, transparent, var(--t-accent), transparent);
+  opacity: 0.5;
+  height: 2px;
 }
-#splash p { color: rgba(241,223,189,0.84); }
+#splash p {
+  color: var(--t-text-muted);
+}
+
+/* 状态栏 */
 #status-bar {
-  position: relative;
-  height: 76px;
-  padding: 10px 18px;
-  gap: 12px;
-  color: var(--art-muted);
-  background:
-    radial-gradient(circle at 3% 52%, rgba(214,176,106,0.10), transparent 8%),
-    radial-gradient(circle at 97% 52%, rgba(214,176,106,0.10), transparent 8%),
-    linear-gradient(180deg, rgba(255,235,180,0.10), transparent 14%),
-    repeating-linear-gradient(0deg, rgba(255,255,255,0.024) 0 1px, transparent 1px 9px),
-    repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 3px, transparent 3px 28px),
-    linear-gradient(180deg, #2b1b10 0%, #1c120b 50%, #100a06 100%);
-  border-top: 1px solid rgba(214,176,106,0.82);
-  box-shadow:
-    inset 0 1px rgba(255,231,177,0.24),
-    inset 0 5px 0 rgba(0,0,0,0.28),
-    0 -10px 32px rgba(0,0,0,0.58);
-  overflow: hidden;
+  background: var(--t-statusbar-bg);
+  border-top-color: var(--t-border-subtle);
+  color: var(--t-text-muted);
+  height: 32px;
+  box-shadow: none;
 }
-#status-bar::before {
-  content: '';
-  position: absolute;
-  inset: 6px 8px;
-  pointer-events: none;
-  border: 1px solid rgba(157,117,57,0.68);
-  background:
-    linear-gradient(90deg, rgba(214,176,106,0.12), transparent 12%, transparent 88%, rgba(214,176,106,0.12)),
-    linear-gradient(180deg, rgba(255,232,178,0.04), transparent 40%, rgba(0,0,0,0.15));
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.70);
-}
-#status-bar .seg,
-.status-crest,
-.status-separator {
-  position: relative;
-  z-index: 1;
-}
-.status-crest {
-  width: 52px;
-  height: 52px;
-  flex: 0 0 52px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #d6ae62;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(245,213,143,0.18), transparent 44%),
-    linear-gradient(135deg, rgba(255,238,190,0.12), transparent 38%),
-    linear-gradient(180deg, #21150d, #120b06);
-  border: 1px solid rgba(168,123,54,0.82);
-  clip-path: polygon(24% 0, 76% 0, 100% 24%, 100% 76%, 76% 100%, 24% 100%, 0 76%, 0 24%);
-  box-shadow:
-    inset 0 0 0 2px rgba(0,0,0,0.58),
-    inset 0 0 0 3px rgba(214,176,106,0.16),
-    inset 0 1px rgba(255,232,178,0.13);
-}
-.status-crest span {
-  font-size: 25px;
-  text-shadow: 0 0 12px rgba(214,176,106,0.28);
-}
-.status-label {
-  color: rgba(207,187,148,0.72);
-  font-size: 14px;
-  font-weight: 500;
-}
-.status-chapter-block {
-  position: relative;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  max-width: min(460px, 38vw);
-}
+#status-bar::before { display: none; }
+
+/* 状态栏装饰件简化 */
+.status-crest { display: none; }
 .status-plaque,
 .status-map-title,
 #status-mode,
 #status-saved {
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(157,117,57,0.72);
-  background:
-    linear-gradient(180deg, rgba(255,239,199,0.08), transparent 38%),
-    linear-gradient(180deg, #1f150c, #0a0705);
-  box-shadow:
-    inset 0 0 0 1px rgba(0,0,0,0.68),
-    inset 0 1px rgba(255,232,178,0.12);
-  color: var(--art-ivory);
-  text-shadow: 0 1px 1px rgba(0,0,0,0.8);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--t-text-secondary);
+  text-shadow: none;
+  font-weight: 500;
+  font-size: 12px;
+  min-height: unset;
+  padding: 0;
 }
 .status-plaque {
-  min-width: 250px;
-  width: min(320px, 30vw);
-  max-width: min(360px, 30vw);
-  padding: 0 16px;
-  font-size: 15px;
-  font-weight: 760;
-  gap: 10px;
-  cursor: pointer;
-}
-.status-plaque:hover,
-.status-plaque:focus-visible {
-  border-color: rgba(232,196,124,0.95);
-  color: #fff0c5;
-}
-.status-chapter-number,
-.status-chapter-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.status-chapter-number {
-  flex: 0 0 auto;
-  color: #f1d9a4;
-}
-.status-chapter-title {
-  color: var(--art-ivory);
-  font-weight: 720;
-}
-#status-bar .status-map-title {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 2;
-  transform: translate(-50%, -50%);
-  width: min(560px, 36vw);
-  min-height: 42px;
-  padding: 0 26px;
-  gap: 12px;
-  font-size: 16px;
-  font-weight: 780;
-  letter-spacing: 0;
-}
-@media (max-width: 1400px) {
-  #status-bar .status-map-title {
-    width: min(420px, 30vw);
-  }
-}
-.status-map-label {
-  color: var(--art-muted);
+  min-width: unset;
+  width: auto;
+  max-width: unset;
+  font-size: 12px;
   font-weight: 600;
 }
-.status-map-value,
-.status-internal-scene {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.status-chapter-number {
+  color: var(--t-accent);
 }
-.status-internal-scene {
-  display: none;
-  color: rgba(159,139,102,0.58);
-  max-width: 180px;
-  font-size: 11px;
+.status-map-title {
+  position: static;
+  transform: none;
+  width: auto;
+  min-height: unset;
+  font-size: 12px;
+  font-weight: 500;
 }
 .status-separator {
-  width: 1px;
-  height: 44px;
-  background: linear-gradient(180deg, transparent, rgba(214,176,106,0.45), transparent);
+  background: var(--t-border-subtle);
+  height: 14px;
 }
-.status-ops {
-  display: inline-flex;
-  gap: 10px;
-  color: rgba(241,223,189,0.70);
+#status-saved[data-save-state="dirty"] {
+  color: var(--t-warn);
+  font-weight: 600;
 }
-.status-right-group {
-  position: relative;
-  z-index: 2;
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-#status-mode {
-  min-width: 120px;
-  padding: 0 14px;
-  color: #e7c98b;
-  font-weight: 760;
-}
-#status-saved {
-  min-width: 120px;
-  padding: 0 32px 0 16px;
-  color: #f2d7a3;
-  font-size: 16px;
-  font-weight: 800;
-}
-#status-saved::after {
-  content: '';
-  position: absolute;
-  right: 14px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #b86135;
-  box-shadow: 0 0 10px rgba(184,97,53,0.7);
-}
-#status-saved[data-save-state="saved"]::after {
-  background: #83b86b;
-  box-shadow: 0 0 10px rgba(131,184,107,0.62);
-}
-#status-saved[data-save-state="saving"]::after {
-  background: #d6b06a;
-  box-shadow: 0 0 10px rgba(214,176,106,0.68);
-}
-#status-error {
-  color: #ffb4a8;
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-@media (max-width: 1500px) {
-  .status-right-group .status-label,
-  .status-right-group #status-zoom,
-  .status-right-group .status-ops {
-    display: none;
-  }
-}
-#dropdown-menu,
-.modal-card,
-#event-card,
-#token-action-bar,
-#annotation-action-bar,
-#grid-calibration-panel,
+.status-label { color: var(--t-text-muted); font-size: 11px; }
+
+/* 面板通用 */
 #object-panel,
-#loading-overlay .spinner {
-  border-color: rgba(157,117,57,0.72);
-  box-shadow:
-    inset 0 1px rgba(255,232,178,0.10),
-    var(--theme-shadow-spread) rgba(0,0,0,0.52);
-}
-#dropdown-menu,
-.modal-card,
+#grid-calibration-panel,
+#reveal-zone-panel,
 #event-card,
 #token-action-bar,
-#annotation-action-bar,
-#grid-calibration-panel,
-#object-panel {
-  background:
-    linear-gradient(180deg, rgba(255,239,199,0.05), transparent 28%),
-    color-mix(in srgb, var(--art-panel) 94%, transparent);
+#annotation-action-bar {
+  background: var(--t-surface);
+  border-color: var(--t-border);
+  border-radius: var(--t-panel-radius);
+  box-shadow: var(--t-panel-shadow);
+  backdrop-filter: blur(8px);
 }
-.modal-title,
-.object-panel-title,
-.event-card-title,
-#grid-calibration-panel .panel-title {
-  color: var(--art-ivory);
-}
-.modal-desc,
-.object-panel-meta,
-.object-section-title,
-.object-sub,
-#grid-calibration-panel .panel-meta {
-  color: var(--art-muted);
+
+.object-panel-header {
+  border-bottom-color: var(--t-border-subtle);
 }
 .object-panel-tools {
-  border-bottom-color: rgba(157,117,57,0.36);
-  background: rgba(0,0,0,0.12);
+  border-bottom-color: var(--t-border-subtle);
 }
 .object-panel-search {
-  background: linear-gradient(180deg, #1a120b, #0b0705);
-  border-color: rgba(157,117,57,0.58);
-  color: var(--art-ivory);
+  background: var(--t-surface-raised);
+  border-color: var(--t-border);
+  color: var(--t-text);
 }
-.object-filter-tabs {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+/* 下拉菜单 */
+#dropdown-menu {
+  background: var(--t-surface);
+  border-color: var(--t-border);
+  border-radius: var(--t-panel-radius);
+  box-shadow: var(--t-panel-shadow);
 }
-.object-row {
-  border-color: rgba(157,117,57,0.18);
-  background: rgba(0,0,0,0.08);
+.menu-item {
+  color: var(--t-text-secondary);
+  border-radius: calc(var(--t-btn-radius) - 2px);
 }
-.object-row:hover {
-  background: rgba(214,176,106,0.08);
-  border-color: rgba(157,117,57,0.54);
+.menu-item:hover {
+  background: var(--t-surface-raised);
+  color: var(--t-text);
 }
-.object-row.selected {
-  border-color: rgba(235,199,121,0.95);
-  background: rgba(214,176,106,0.13);
+.menu-item.danger { color: var(--t-danger); }
+.menu-section { color: var(--t-text-muted); }
+.menu-divider { border-top-color: var(--t-border-subtle); }
+
+/* Modal */
+.modal-card {
+  background: var(--t-surface);
+  border-color: var(--t-border);
+  border-radius: var(--t-panel-radius);
 }
-.object-thumb {
-  background:
-    radial-gradient(circle at 50% 35%, rgba(214,176,106,0.16), transparent 42%),
-    linear-gradient(180deg, #21150d, #0c0805);
-  border: 1px solid rgba(157,117,57,0.46);
-  color: var(--art-brass-hi);
+.modal-title { color: var(--t-text); }
+.modal-desc { color: var(--t-text-secondary); }
+.modal-actions button.primary {
+  background: var(--t-accent) !important;
+  border-color: var(--t-accent) !important;
+  color: var(--t-accent-text) !important;
 }
-.object-name { color: var(--art-ivory); }
-.object-locate,
-.object-edit {
-  color: var(--art-brass-hi);
-  border: 1px solid rgba(157,117,57,0.28);
-  background: rgba(0,0,0,0.12);
+
+/* 骰子面板 */
+.dice-panel {
+  background: var(--t-surface);
+  border-color: var(--t-border);
+  box-shadow: var(--t-panel-shadow);
 }
-.object-locate:hover,
-.object-edit:hover {
-  color: #fff2cf;
-  background: rgba(214,176,106,0.14);
+.dice-total { color: var(--t-accent); }
+.dice-detail { color: var(--t-text-secondary); }
+
+/* 表单元素 */
+.form-row input[type="text"],
+.form-row textarea,
+.form-row select,
+.form-row input[type="password"],
+.form-row input[type="url"],
+.entry-hotkey-action,
+#brush-size-input,
+#dice-expression {
+  background: var(--t-surface-raised);
+  border-color: var(--t-border);
+  color: var(--t-text);
 }
-.event-card-icon {
-  background: linear-gradient(180deg, #2a1b11, #0b0705);
-  border: 1px solid rgba(157,117,57,0.50);
+.form-row label { color: var(--t-text-secondary); }
+.form-note { color: var(--t-text-muted); }
+
+/* 滚动条 (Webkit) */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--t-border);
+  border-radius: 3px;
 }
-.toast-message {
-  color: var(--art-ivory);
-  background:
-    linear-gradient(180deg, rgba(255,239,199,0.08), transparent 30%),
-    linear-gradient(180deg, #25190d, #0a0705);
-  border-color: rgba(214,176,106,0.78);
-}
-@media (max-width: 1024px) {
-  #toolbar {
-    min-height: 56px;
-    padding: 7px 8px;
-    gap: 7px;
-  }
-  #toolbar button {
-    min-height: 40px;
-    padding: 0 11px;
-    font-size: 13px;
-  }
-  .toolbar-divider { height: 40px; }
-  #status-bar {
-    height: 68px;
-    padding: 8px 10px;
-    gap: 9px;
-  }
-  .status-label,
-  .status-internal-scene,
-  #status-zoom,
-  .status-ops { display: none; }
-  .status-chapter-block {
-    max-width: 32vw;
-  }
-  .status-plaque {
-    min-width: 190px;
-    width: min(260px, 28vw);
-    max-width: 28vw;
-  }
-  #status-bar .status-map-title { width: min(360px, 32vw); }
-  #status-saved { min-width: 100px; }
-}
-@media (max-width: 1100px) {
-  #status-bar .status-map-title {
-    position: relative;
-    left: auto;
-    top: auto;
-    transform: none;
-    width: auto;
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-}
-@media (max-width: 860px) {
-  #toolbar {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(214,176,106,0.55) transparent;
-  }
-  #toolbar::-webkit-scrollbar {
-    display: block;
-    height: 6px;
-  }
-  #toolbar::-webkit-scrollbar-thumb {
-    background: rgba(214,176,106,0.55);
-    border-radius: 999px;
-  }
-  #toolbar .label-only { display: none; }
-  #toolbar button {
-    min-width: 42px;
-    padding: 0 9px;
-  }
-  .entry-manager-row,
-  .entry-manager-new-row {
-    grid-template-columns: 1fr;
-  }
-  .entry-manager-row .entry-color-dot {
-    display: none;
-  }
-  #status-bar {
-    height: 68px;
-    padding: 8px;
-    gap: 8px;
-  }
-  .status-crest {
-    width: 44px;
-    height: 44px;
-    flex-basis: 44px;
-  }
-  .status-chapter-block {
-    max-width: 30vw;
-  }
-  .status-plaque {
-    min-width: 112px;
-    width: auto;
-    max-width: 30vw;
-    padding: 0 10px;
-    font-size: 13px;
-    gap: 6px;
-  }
-  #status-bar .status-map-title {
-    position: relative;
-    left: auto;
-    top: auto;
-    transform: none;
-    width: auto;
-    min-width: 0;
-    flex: 1 1 auto;
-    padding: 0 10px;
-    font-size: 13px;
-    min-height: 34px;
-  }
-  #status-mode { display: none; }
-  .status-right-group {
-    margin-left: 0;
-    flex: 0 0 auto;
-  }
-  #status-saved {
-    min-width: 92px;
-    padding-left: 12px;
-    font-size: 13px;
-    flex: 0 0 auto;
-  }
-}
-@media (max-width: 720px) {
-  #toolbar .label-only { display: none; }
-  #toolbar {
-    min-height: 52px;
-    padding: 6px;
-  }
-  #toolbar button {
-    min-width: 42px;
-    padding: 0 9px;
-  }
-  #brush-size-input { width: 58px; }
-  #object-panel {
-    top: auto;
-    left: 8px;
-    width: auto;
-    height: min(48vh, 360px);
-  }
-  #status-bar {
-    height: 70px;
-    padding: 8px;
-    gap: 8px;
-  }
-  .status-crest {
-    width: 42px;
-    height: 42px;
-    flex-basis: 42px;
-  }
-  .status-chapter-block {
-    max-width: 26vw;
-  }
-  .status-plaque {
-    min-width: 96px;
-    width: auto;
-    max-width: 26vw;
-    padding: 0 10px;
-    font-size: 13px;
-  }
-  #status-bar .status-map-title {
-    min-width: 0;
-    flex: 1;
-    max-width: none;
-    padding: 0 10px;
-    font-size: 13px;
-  }
-  #status-mode { display: none; }
-  #status-saved {
-    min-width: 92px;
-    padding-left: 12px;
-    font-size: 13px;
-  }
-}
+::-webkit-scrollbar-thumb:hover { background: var(--t-text-muted); }
+
+/* parchment 主题需要 color-scheme: light */
+[data-theme="parchment"] button.active .nav-ico { color: var(--t-accent-text); }
+[data-theme="parchment"] .toolbar-label { color: var(--t-text-muted); }
+[data-theme="parchment"] #status-bar { color: var(--t-text-muted); }
 </style>
 </head>
 <body>
@@ -2084,6 +1909,8 @@ const BRUSH_MIN = 20, BRUSH_MAX = 300, BRUSH_DEFAULT = 60;
 const TOKEN_EXPLORE_RADIUS_MIN = 20;
 const TOKEN_EXPLORE_RADIUS_MAX = 600;
 const TOKEN_EXPLORE_RADIUS_DEFAULT = 120;
+const TOKEN_EXPLORE_DRAG_STEP = 12;
+const TOKEN_EXPLORE_DRAG_INTERVAL_MS = 35;
 const SCALE_MIN = 0.1, SCALE_MAX = 10;
 const SCHEMA_VERSION = 3;
 const DB_NAME = 'fog-of-war-map';
@@ -2115,29 +1942,41 @@ const DEFAULT_EMOJIS = [
 
 // ============== Theme ==============
 const DEFAULT_DARK_THEME = {
-  bg: '#0a0a0a', bgPanel: '#1a1a1a', panelBlurAlpha: 0.85,
-  bgInput: '#27272a', border: '#3f3f46',
-  text: '#e4e4e7', textMuted: '#71717a',
-  accent: '#3b82f6', danger: '#ef4444', warn: '#facc15',
+  bg: '#1a1816', bgPanel: '#211f1c', panelBlurAlpha: 0.85,
+  bgInput: '#2a2724', border: '#332f2a',
+  text: '#d8d0c4', textMuted: '#6b6157',
+  accent: '#e8943a', danger: '#d4493a', warn: '#e8943a',
   shadowColor: 'rgba(0,0,0,0.4)', shadowSpread: '0 4px 16px',
   brushPreviewTerrain: 'rgba(255,255,255,0.85)',
-  brushPreviewEvent: 'rgba(167,139,250,0.85)',
-  brushLabelColor: '#e4e4e7',
+  brushPreviewEvent: 'rgba(232,148,58,0.85)',
+  brushLabelColor: '#d8d0c4',
   brushLabelOutline: 'rgba(0,0,0,0.7)',
   fogColor: '#000', fogBlendMode: 'normal',
-  eventIconBg: 'rgba(255,255,255,0.85)',
-  eventIconEdge: 'rgba(0,0,0,0.25)',
-  eventSelectedGlow: '#a78bfa',
+  eventIconBg: '#2a2724',
+  eventIconEdge: '#332f2a',
+  eventSelectedGlow: '#e8943a',
   textOutline: 'rgba(0,0,0,0.85)',
-  semantic: { player: '#3b82f6', enemy: '#ef4444', npc: '#eab308' },
+  semantic: { player: '#e8943a', enemy: '#d4493a', npc: '#e8943a' },
   preserveSemanticHue: true,
-  tokenSelectedGlow: '#3b82f6',
-  splashTextColor: '#52525b', loadingSpinnerColor: '#3b82f6',
+  tokenSelectedGlow: '#e8943a',
+  splashTextColor: '#6b6157', loadingSpinnerColor: '#e8943a',
   fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   fontFamilyDecorative: 'system-ui, -apple-system, sans-serif',
   radiusSm: 4, radiusMd: 8, radiusLg: 12,
   maxDpr: 2,
 };
+const THEMES = [
+  { id: 'stone', name: '深暖石板', icon: '🪨' },
+  { id: 'ink-gold', name: '墨夜金线', icon: '✒️' },
+  { id: 'parchment', name: '古卷轴', icon: '📜' },
+  { id: 'blueprint', name: '制图蓝', icon: '📐' },
+  { id: 'theater', name: '深红剧院', icon: '🎭' },
+  { id: 'forest', name: '翡翠森林', icon: '🌲' },
+];
+const THEME_STORAGE_KEY = 'fog-theme';
+let currentThemeId = 'stone';
+let customThemeActive = false;
+const DEFAULT_ENTRY_COLORS = ['#fbbf24', '#60a5fa', '#34d399', '#f87171', '#c084fc', '#f472b6', '#a3e635', '#fb923c'];
 const OPTIONAL_THEME_FIELDS = new Set([
   'strokeProfile', 'panelTextureUrl', 'borderImageUrl', 'presentOverrides',
 ]);
@@ -2734,7 +2573,7 @@ function hideObjectPanel() {
   if (panel) panel.innerHTML = '';
 }
 
-const ENTRY_COLORS = ['#fbbf24', '#60a5fa', '#34d399', '#f87171', '#c084fc', '#f472b6', '#a3e635', '#fb923c'];
+let ENTRY_COLORS = DEFAULT_ENTRY_COLORS.slice();
 
 function normalizeEntryName(name) {
   return String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -3436,6 +3275,80 @@ async function loadMapBlobIntoCanvases(blob, opts = {}) {
 }
 
 // ============== Theme ==============
+function themeCss(name, fallback = '') {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+function colorWithAlpha(color, alpha) {
+  const hex = normalizeHex(color || '#000000').replace('#', '');
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function syncRuntimeThemeFromCss() {
+  const accent = themeCss('--t-accent', DEFAULT_DARK_THEME.accent);
+  const danger = themeCss('--t-danger', DEFAULT_DARK_THEME.danger);
+  const warn = themeCss('--t-warn', DEFAULT_DARK_THEME.warn);
+  const bg = themeCss('--t-bg', DEFAULT_DARK_THEME.bg);
+  const surface = themeCss('--t-surface', DEFAULT_DARK_THEME.bgPanel);
+  const raised = themeCss('--t-surface-raised', DEFAULT_DARK_THEME.bgInput);
+  const border = themeCss('--t-border', DEFAULT_DARK_THEME.border);
+  const text = themeCss('--t-text', DEFAULT_DARK_THEME.text);
+  const muted = themeCss('--t-text-muted', DEFAULT_DARK_THEME.textMuted);
+  const radius = parseInt(themeCss('--t-btn-radius', '8'), 10) || DEFAULT_DARK_THEME.radiusMd;
+  const panelRadius = parseInt(themeCss('--t-panel-radius', '12'), 10) || DEFAULT_DARK_THEME.radiusLg;
+  const runtimeFields = {
+    bg,
+    bgPanel: surface,
+    bgInput: raised,
+    border,
+    text,
+    textMuted: muted,
+    accent,
+    danger,
+    warn,
+    brushPreviewEvent: colorWithAlpha(accent, 0.85),
+    brushLabelColor: text,
+    eventIconBg: raised,
+    eventIconEdge: border,
+    eventSelectedGlow: accent,
+    semantic: { player: accent, enemy: danger, npc: warn },
+    preserveSemanticHue: true,
+    tokenSelectedGlow: accent,
+    splashTextColor: muted,
+    loadingSpinnerColor: accent,
+    radiusSm: Math.max(0, radius - 4),
+    radiusMd: radius,
+    radiusLg: panelRadius,
+  };
+  const runtime = currentThemeId === 'stone'
+    ? DEFAULT_DARK_THEME
+    : Object.assign({}, DEFAULT_DARK_THEME, runtimeFields);
+  customThemeActive = false;
+  applyTheme(runtime, { preserveCssTheme: true });
+  ENTRY_COLORS = [warn, accent, '#34d399', danger, '#c084fc', '#f472b6', '#a3e635', '#fb923c']
+    .map((color) => normalizeHex(color || warn));
+}
+
+function setTheme(themeId) {
+  const normalized = THEMES.some((theme) => theme.id === themeId) ? themeId : 'stone';
+  currentThemeId = normalized;
+  customThemeActive = false;
+  document.documentElement.setAttribute('data-theme', normalized);
+  try { localStorage.setItem(THEME_STORAGE_KEY, normalized); } catch (_) {}
+  document.documentElement.offsetHeight;
+  syncRuntimeThemeFromCss();
+  scheduleRender('all');
+}
+
+function initTheme() {
+  let saved = 'stone';
+  try { saved = localStorage.getItem(THEME_STORAGE_KEY) || 'stone'; } catch (_) {}
+  setTheme(saved);
+}
+
 function validateTheme(obj) {
   const result = { ok: true, missing: [], extra: [] };
   for (const k of Object.keys(DEFAULT_DARK_THEME)) {
@@ -3449,11 +3362,17 @@ function validateTheme(obj) {
   return result;
 }
 
-function applyTheme(theme) {
-  // 同帧提交：CSS 变量与 Canvas 重绘一帧内完成
-  requestAnimationFrame(() => {
+function applyTheme(theme, opts = {}) {
+  const preserveCssTheme = Boolean(opts.preserveCssTheme);
+  customThemeActive = !preserveCssTheme;
+  const commit = () => {
     state.theme = theme;
     const root = document.documentElement;
+    if (!preserveCssTheme) {
+      currentThemeId = 'custom';
+      root.removeAttribute('data-theme');
+      try { localStorage.removeItem(THEME_STORAGE_KEY); } catch (_) {}
+    }
     root.style.setProperty('--theme-bg', theme.bg);
     root.style.setProperty('--theme-bg-panel', theme.bgPanel);
     root.style.setProperty('--theme-panel-blur-alpha', String(theme.panelBlurAlpha));
@@ -3472,9 +3391,11 @@ function applyTheme(theme) {
     root.style.setProperty('--theme-font-family', theme.fontFamily);
     root.style.setProperty('--theme-splash-text', theme.splashTextColor);
     root.style.setProperty('--theme-loading-spinner', theme.loadingSpinnerColor);
-    root.style.setProperty('color-scheme', 'dark');
+    root.style.setProperty('color-scheme', currentThemeId === 'parchment' ? 'light' : 'dark');
     scheduleRender('all');
-  });
+  };
+  if (preserveCssTheme) commit();
+  else requestAnimationFrame(commit);
 }
 
 function loadCustomTheme(custom) {
@@ -3483,7 +3404,7 @@ function loadCustomTheme(custom) {
   const v = validateTheme(merged);
   if (!v.ok) {
     console.warn('Theme missing fields, fallback to default:', v.missing);
-    applyTheme(DEFAULT_DARK_THEME);
+    setTheme('stone');
     return;
   }
   applyTheme(merged);
@@ -3493,7 +3414,7 @@ function openThemePrompt() {
   // Ctrl+Shift+T 开发者快捷键，输入 JSON 切主题
   const json = prompt('粘贴主题 JSON（取消恢复默认主题）');
   if (json === null) return;
-  if (!json.trim()) { applyTheme(DEFAULT_DARK_THEME); showToast('已恢复默认主题'); return; }
+  if (!json.trim()) { setTheme('stone'); showToast('已恢复默认主题'); return; }
   try {
     const partial = JSON.parse(json);
     loadCustomTheme(partial);
@@ -3821,7 +3742,7 @@ async function doSaveMain() {
     const ok = await syncActiveSceneToMemory();
     if (!ok) return;
   }
-  const isDefault = state.theme === DEFAULT_DARK_THEME;
+  const isDefault = !customThemeActive;
   const main = {
     version: SCHEMA_VERSION,
     scenes: state.scenes,
@@ -3973,7 +3894,7 @@ async function exportProject() {
     }
     if (!scenes.length) throw new Error('没有可导出的场景');
     // 主题：仅在非默认时导出
-    const isDefaultTheme = state.theme === DEFAULT_DARK_THEME;
+    const isDefaultTheme = !customThemeActive;
     const payload = {
       format: 'fog-of-war-map.fogbundle',
       schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
@@ -4159,7 +4080,7 @@ async function doImportSceneBundle(payload, selectedFiles) {
     if (Object.prototype.hasOwnProperty.call(payload, 'customTheme')) {
       try {
         if (payload.customTheme) loadCustomTheme(payload.customTheme);
-        else applyTheme(DEFAULT_DARK_THEME);
+        else setTheme('stone');
       } catch (e) { console.warn('导入主题失败', e); }
     }
     state.diceHistory = normalizeDiceHistory(payload.diceHistory || []);
@@ -4833,6 +4754,7 @@ function drawAll() {
   const setScreenTransform = () => ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   // 1. 地图
+  drawMapSurfaceShadow(ctx, setScreenTransform);
   setMapTransform();
   ctx.drawImage(state.mapCanvas, 0, 0);
 
@@ -4866,6 +4788,34 @@ function drawAll() {
 
   // 7. Token（最上层，永远可见）
   drawTokens(ctx);
+}
+
+function drawMapSurfaceShadow(ctx, setScreenTransform) {
+  if (currentThemeId !== 'parchment') return;
+  const w = state.mapCanvas.width * state.view.scale;
+  const h = state.mapCanvas.height * state.view.scale;
+  if (w <= 0 || h <= 0) return;
+  setScreenTransform();
+  ctx.save();
+
+  // parchment 采用单一柔光投影，避免出现硬朗的 L 型阴影带。
+  const x = state.view.x;
+  const y = state.view.y;
+  ctx.shadowColor = 'rgba(55,34,14,0.5)';
+  ctx.shadowBlur = 34;
+  ctx.shadowOffsetX = 18;
+  ctx.shadowOffsetY = 24;
+  ctx.fillStyle = 'rgba(55,34,14,0.2)';
+  ctx.fillRect(x, y, w, h);
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+
+  ctx.strokeStyle = 'rgba(58,36,16,0.34)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(state.view.x + 0.5, state.view.y + 0.5, Math.max(0, w - 1), Math.max(0, h - 1));
+  ctx.restore();
 }
 
 function drawTokens(ctx) {
@@ -5310,18 +5260,22 @@ function normalizeTokenExploreRadius(value) {
   return clamp(n, TOKEN_EXPLORE_RADIUS_MIN, TOKEN_EXPLORE_RADIUS_MAX);
 }
 
-function paintTokenExploreFog(token) {
-  if (!token || !token.explorerEnabled || !state.hasMap) return false;
-  const radius = normalizeTokenExploreRadius(token.exploreRadius);
-  const mx = clamp(token.x, 0, state.mapCanvas.width);
-  const my = clamp(token.y, 0, state.mapCanvas.height);
-  const layerKeys = ['terrain', 'event'];
-  const stroke = {
+function createTokenExploreStroke() {
+  return {
     layer: 'all',
     mode: 'reveal',
     affectedTiles: new Map(),
     bounds: null,
   };
+}
+
+function paintTokenExploreFogIntoStroke(token, stroke) {
+  if (!token || !token.explorerEnabled || !state.hasMap || !stroke) return false;
+  const radius = normalizeTokenExploreRadius(token.exploreRadius);
+  const mx = clamp(token.x, 0, state.mapCanvas.width);
+  const my = clamp(token.y, 0, state.mapCanvas.height);
+  const layerKeys = ['terrain', 'event'];
+  const beforeTileCount = stroke.affectedTiles.size;
   const minTx = Math.max(0, Math.floor((mx - radius) / TILE_SIZE));
   const maxTx = Math.min(Math.floor((state.mapCanvas.width - 1) / TILE_SIZE), Math.floor((mx + radius) / TILE_SIZE));
   const minTy = Math.max(0, Math.floor((my - radius) / TILE_SIZE));
@@ -5334,15 +5288,82 @@ function paintTokenExploreFog(token) {
       if (rw > 0 && rh > 0) captureStrokeTile(stroke, tx, ty, { x: rx, y: ry, w: rw, h: rh }, layerKeys);
     }
   }
-  if (stroke.affectedTiles.size === 0) return false;
+  if (stroke.affectedTiles.size === beforeTileCount && beforeTileCount === 0) return false;
   for (const layerKey of layerKeys) paintCircleOnFogLayer(layerKey, mx, my, radius, 'reveal');
-  stroke.bounds = { x: mx - radius, y: my - radius, w: radius * 2, h: radius * 2 };
+  const dirty = { x: mx - radius, y: my - radius, w: radius * 2, h: radius * 2 };
+  if (!stroke.bounds) stroke.bounds = { ...dirty };
+  else mergeRectInto(stroke.bounds, dirty);
+  return true;
+}
+
+function commitTokenExploreStroke(stroke) {
+  if (!stroke || stroke.affectedTiles.size === 0) return false;
   pushUndo({ type: 'fog', kind: 'tiles', layer: 'all', tiles: [...stroke.affectedTiles.values()] });
   state.strokesSinceCheckpoint += 1;
   maybeCheckpoint();
   refreshSelectionUi();
-  scheduleRender(stroke.bounds);
   return true;
+}
+
+function paintTokenExploreFog(token) {
+  const stroke = createTokenExploreStroke();
+  const painted = paintTokenExploreFogIntoStroke(token, stroke);
+  if (!painted) return false;
+  commitTokenExploreStroke(stroke);
+  scheduleRender(stroke.bounds || 'all');
+  return true;
+}
+
+function beginTokenExploreDrag(info, token) {
+  if (!info || !token || !token.explorerEnabled || info.exploreStroke) return;
+  info.exploreStroke = createTokenExploreStroke();
+  info.exploreLastMapX = null;
+  info.exploreLastMapY = null;
+  info.exploreLastAt = 0;
+}
+
+function paintTokenExploreDrag(info, token, opts = {}) {
+  if (!info || !token || !token.explorerEnabled || !state.hasMap) return false;
+  beginTokenExploreDrag(info, token);
+  const now = performance.now();
+  const mx = clamp(token.x, 0, state.mapCanvas.width);
+  const my = clamp(token.y, 0, state.mapCanvas.height);
+  const moved = info.exploreLastMapX == null
+    ? Infinity
+    : dist(info.exploreLastMapX, info.exploreLastMapY, mx, my);
+  if (!opts.force && moved < TOKEN_EXPLORE_DRAG_STEP && (now - info.exploreLastAt) < TOKEN_EXPLORE_DRAG_INTERVAL_MS) {
+    return false;
+  }
+  const ok = paintTokenExploreFogIntoStroke(token, info.exploreStroke);
+  if (ok) {
+    info.exploreLastMapX = mx;
+    info.exploreLastMapY = my;
+    info.exploreLastAt = now;
+    scheduleRender(info.exploreStroke.bounds || 'all');
+  }
+  return ok;
+}
+
+function finishTokenExploreDrag(info) {
+  if (!info || !info.exploreStroke) return false;
+  const stroke = info.exploreStroke;
+  info.exploreStroke = null;
+  return commitTokenExploreStroke(stroke);
+}
+
+function cancelTokenExploreDrag(info) {
+  if (!info || !info.exploreStroke) return;
+  const stroke = info.exploreStroke;
+  const layerKeys = ['terrain', 'event'];
+  for (const [, snap] of stroke.affectedTiles) {
+    if (!snap.images) continue;
+    for (const layerKey of layerKeys) {
+      const img = snap.images[layerKey];
+      if (img) state.fogLayers[layerKey].ctx.putImageData(img, snap.rect.x, snap.rect.y);
+    }
+  }
+  info.exploreStroke = null;
+  scheduleRender(stroke.bounds || 'all');
 }
 
 function paintBrushAt(sx, sy) {
@@ -7128,6 +7149,9 @@ function onPointerMove(e) {
       t.x = info.tokenStartX + dx;
       t.y = info.tokenStartY + dy;
       clampTokenToMap(t);
+      if (t.explorerEnabled && dist(info.startX, info.startY, x, y) > EVENT_DRAG_THRESHOLD) {
+        paintTokenExploreDrag(info, t);
+      }
       scheduleRender('all');
       positionTokenActionBar();
     }
@@ -7195,7 +7219,10 @@ function onPointerUp(e) {
   } else if (info.role === 'token-drag') {
     const t = state.tokens.find((tt) => tt.id === info.tokenId);
     const moved = t && dist(info.startX, info.startY, info.lastX, info.lastY) > EVENT_DRAG_THRESHOLD;
-    if (moved && t.explorerEnabled) paintTokenExploreFog(t);
+    if (moved && t?.explorerEnabled) {
+      paintTokenExploreDrag(info, t, { force: true });
+      finishTokenExploreDrag(info);
+    }
     triggerImmediateSave();
   } else if (info.role === 'annotation-drag') {
     const ann = state.annotations.find((a) => a.id === info.annotationId);
@@ -7437,7 +7464,10 @@ function onKeyDown(e) {
     if (dragging) {
       if (dragging.role === 'token-drag') {
         const t = state.tokens.find((tt) => tt.id === dragging.tokenId);
-        if (t) { t.x = dragging.tokenStartX; t.y = dragging.tokenStartY; scheduleRender('all'); }
+        if (t) {
+          cancelTokenExploreDrag(dragging);
+          t.x = dragging.tokenStartX; t.y = dragging.tokenStartY; scheduleRender('all');
+        }
       } else if (dragging.role === 'annotation-drag') {
         const ann = state.annotations.find((a) => a.id === dragging.annotationId);
         if (ann) { ann.x = dragging.annotationStartX; ann.y = dragging.annotationStartY; scheduleRender('all'); positionAnnotationActionBar(); }
@@ -8005,7 +8035,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.25.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.26.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -8579,7 +8609,7 @@ async function cloudSync_serializeStateBundle(opts = {}) {
       mapMissing: willRestoreAsPlaceholder || Boolean(scene.mapMissing),
     }));
   }
-  const isDefaultTheme = state.theme === DEFAULT_DARK_THEME;
+  const isDefaultTheme = !customThemeActive;
   return {
     format: 'fog-of-war-map.fogbundle',
     schemaVersion: BUNDLE_EXPORT_SCHEMA_VERSION,
@@ -8805,7 +8835,7 @@ async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
   if (Object.prototype.hasOwnProperty.call(bundleJson, 'customTheme')) {
     try {
       if (bundleJson.customTheme) loadCustomTheme(bundleJson.customTheme);
-      else applyTheme(DEFAULT_DARK_THEME);
+      else setTheme('stone');
     } catch (e) {
       console.warn('恢复主题失败', e);
     }
@@ -10126,7 +10156,7 @@ function openTokenUploadDialog(file, existingId) {
     <div class="form-row">
       <label class="form-check" style="margin-bottom:8px;"><input id="token-explorer-enabled" type="checkbox"${initExplorerEnabled ? ' checked' : ''}> 探索 Token</label>
       <input id="token-explore-radius" type="range" min="${TOKEN_EXPLORE_RADIUS_MIN}" max="${TOKEN_EXPLORE_RADIUS_MAX}" step="5" value="${Math.round(initExploreRadius)}">
-      <div class="form-note">清雾半径：<span id="token-explore-radius-value">${Math.round(initExploreRadius)}</span> px。拖动结束后清除地形层和事件层遮罩。</div>
+      <div class="form-note">清雾半径：<span id="token-explore-radius-value">${Math.round(initExploreRadius)}</span> px。拖动时清除地形层和事件层遮罩。</div>
     </div>
     ${entryAssignmentHTML(initEntryIds)}
     <div class="modal-actions">
@@ -11076,6 +11106,23 @@ function showDropdown() {
   revealZoneBtn.addEventListener('click', () => { hideDropdown(); openRevealZonesModal(); });
   menu.appendChild(revealZoneBtn);
 
+  appendMenuDivider(menu);
+  const themeSection = document.createElement('div');
+  themeSection.className = 'menu-section';
+  themeSection.textContent = '外观';
+  menu.appendChild(themeSection);
+  THEMES.forEach((theme) => {
+    const active = theme.id === currentThemeId;
+    const themeBtn = mkMenuItem(`${active ? '✓ ' : ''}${theme.icon} ${theme.name}`);
+    themeBtn.classList.toggle('active', active);
+    themeBtn.addEventListener('click', () => {
+      setTheme(theme.id);
+      hideDropdown();
+      showToast(`已切换外观：${theme.name}`, 1200);
+    });
+    menu.appendChild(themeBtn);
+  });
+
   if (isEditSurface()) {
     const clearCpBtn = mkMenuItem('清理全部 Checkpoint');
     clearCpBtn.addEventListener('click', () => {
@@ -11310,9 +11357,6 @@ async function init() {
   state.mapCtx = state.mapCanvas.getContext('2d');
   // fogLayers ctx 已在 state 定义时创建
 
-  // 应用默认主题
-  applyTheme(DEFAULT_DARK_THEME);
-
   resizeMainCanvas();
   await ensureDb();
 
@@ -11328,6 +11372,7 @@ async function init() {
   updateZoomStatus();
   updateSceneStatus();
   cloudSync_bootstrap();
+  initTheme();
 
   // v3: 启动时尝试自动加载 currentScene（如果它有 mapBlob）
   await tryAutoLoadCurrentScene();
