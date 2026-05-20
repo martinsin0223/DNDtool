@@ -145,6 +145,18 @@ button.icon { padding: 6px 10px; }
 #status-bar .seg { white-space: nowrap; }
 #status-bar .error { color: var(--theme-danger); font-weight: 500; }
 #status-bar .toast { color: var(--theme-warn); }
+.status-right-group {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.status-version-stamp {
+  color: var(--theme-text-muted);
+  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ============== Brush rail（触屏右侧竖滑条） ============== */
 #brush-rail {
@@ -1740,6 +1752,10 @@ button.active .nav-ico,
   font-weight: 600;
 }
 .status-label { color: var(--t-text-muted); font-size: 11px; }
+.status-version-stamp {
+  color: var(--t-text-muted);
+  opacity: 0.72;
+}
 
 /* 面板通用 */
 #object-panel,
@@ -1921,6 +1937,7 @@ button.active .nav-ico,
       <span class="seg" id="status-place-event" style="color: var(--theme-accent); font-weight: 600;"></span>
       <span class="seg" id="status-saved" data-save-state="dirty">未保存</span>
       <span class="seg error" id="status-error"></span>
+      <span class="seg status-version-stamp" id="status-version-stamp" title="Build stamp">v3.33.0 | 2026-05-20</span>
     </span>
   </div>
   <div id="dropdown-menu"></div>
