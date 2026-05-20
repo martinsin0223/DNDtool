@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -1923,7 +1923,6 @@ button.active .nav-ico,
 <input id="file-input-annotation-image" class="hidden-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp">
 <input id="file-input-event-icon" class="hidden-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp">
 <input id="file-input-import" class="hidden-input" type="file" accept=".json,.fogsave,.fogbundle,application/json">
-
 <script>
 'use strict';
 
@@ -2019,6 +2018,8 @@ const state = {
   // 多场景管理（v3.0）
   scenes: {},  // id → SceneData
   currentSceneId: null,
+  sceneRuntimeCache: new Map(),
+  sceneRuntimeCacheLimit: 3,
   // 图像（active scene 的渲染层）
   mapImage: null,
   mapCanvas: document.createElement('canvas'),
@@ -2292,7 +2293,6 @@ function rectsOverlap(a, b) {
   return a.x <= b.x + b.w && a.x + a.w >= b.x &&
     a.y <= b.y + b.h && a.y + a.h >= b.y;
 }
-
 function showToast(msg, ms = 2200) {
   const el = document.createElement('div');
   el.className = 'toast-message';
@@ -2401,7 +2401,6 @@ function rollDiceExpression(raw) {
   }
   return { id: uuid(), expression: normalizeDiceExpression(raw), total, detail: details.join('；'), createdAt: Date.now() };
 }
-
 function renderDiceResult(item, error = '') {
   const box = $('dice-result');
   if (!box) return;
@@ -2506,7 +2505,6 @@ function sceneChapterNumber(scene) {
 function sceneChapterTitle(scene) {
   return normalizeChapterTitle(scene && scene.chapterTitle);
 }
-
 // ============== 坐标转换 ==============
 function mapToScreen(mx, my) {
   return [mx * state.view.scale + state.view.x, my * state.view.scale + state.view.y];
@@ -2753,7 +2751,6 @@ function normalizeEntries(entries) {
   out.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.name.localeCompare(b.name, 'zh-Hans-CN'));
   return out;
 }
-
 function getEntryById(id) {
   return (state.entries || []).find((e) => e.id === id) || null;
 }
@@ -3231,7 +3228,6 @@ function locateSelectedObject() {
   else hideEventCard();
   scheduleRender('all');
 }
-
 function applyRestoredView(savedView, opts = {}) {
   if (opts.fitViewAfterRestore || !savedView) {
     fitView();
@@ -3336,6 +3332,9 @@ function commitPreparedMap(prepared) {
   if (state.mapImage && typeof state.mapImage.close === 'function') {
     try { state.mapImage.close(); } catch (_) {}
   }
+  state.mapCanvas = document.createElement('canvas');
+  state.fogLayers.terrain.canvas = document.createElement('canvas');
+  state.fogLayers.event.canvas = document.createElement('canvas');
   state.mapCanvas.width = prepared.w;
   state.mapCanvas.height = prepared.h;
   state.fogLayers.terrain.canvas.width = prepared.w;
@@ -3356,7 +3355,6 @@ async function loadMapBlobIntoCanvases(blob, opts = {}) {
   commitPreparedMap(prepared);
   return prepared;
 }
-
 // ============== Theme ==============
 function themeCss(name, fallback = '') {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -3518,7 +3516,6 @@ function semanticColorOf(borderColor) {
   };
   return map[borderColor] || borderColor;
 }
-
 // ============== IndexedDB ==============
 const migrations = {
   1: (db) => {
@@ -3655,8 +3652,8 @@ async function loadAndMigrateMain() {
 }
 
 // ============== 持久化串行队列 ==============
-function triggerImmediateSave() {
-  state.saveQueue = state.saveQueue.then(doSaveMain).catch((e) => {
+function triggerImmediateSave(opts = {}) {
+  state.saveQueue = state.saveQueue.then(() => doSaveMain(opts)).catch((e) => {
     if (e && e.name === 'QuotaExceededError') setStatusError('存储已满，自动备份失败');
     else { console.warn('save error', e); setStatusError('保存失败：' + (e && e.message || e)); }
   });
@@ -3819,9 +3816,9 @@ async function syncActiveSceneToMemory() {
   return true;
 }
 
-async function doSaveMain() {
+async function doSaveMain(opts = {}) {
   if (!state.dbReady) return;
-  if (state.hasMap && state.currentSceneId) {
+  if (!opts.skipActiveSceneSync && state.hasMap && state.currentSceneId) {
     // 把当前 active state 写到 state.scenes[currentSceneId]
     const ok = await syncActiveSceneToMemory();
     if (!ok) return;
@@ -3867,6 +3864,7 @@ async function clearAllData() {
   await idbDelete('main');
   for (let i = 0; i < CHECKPOINT_LIMIT; i++) await idbDelete('checkpoint-' + i);
   state.scenes = {};
+  clearSceneRuntimeCache();
   state.currentSceneId = null;
 }
 
@@ -4324,8 +4322,168 @@ async function doImportProject(payload) {
     showToast('导入失败：' + (e.message || e));
   }
 }
-
 // ============== 多场景管理（v3.0） ==============
+function cloneCanvasForRuntimeCache(source) {
+  if (!source || !source.width || !source.height) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  canvas.getContext('2d').drawImage(source, 0, 0);
+  return canvas;
+}
+
+function copyCanvasForRuntimeCache(existing, source) {
+  if (!source || !source.width || !source.height) return null;
+  const canvas = existing || document.createElement('canvas');
+  if (canvas.width !== source.width || canvas.height !== source.height) {
+    canvas.width = source.width;
+    canvas.height = source.height;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.globalCompositeOperation = 'copy';
+  ctx.drawImage(source, 0, 0);
+  ctx.restore();
+  return canvas;
+}
+
+function cloneTokenForRuntimeCache(t) {
+  return {
+    ...t,
+    entryIds: objectEntryIds(t),
+  };
+}
+
+function cloneEventIconForRuntimeCache(icon) {
+  if (!icon) return { type: 'emoji', value: '❔' };
+  if (icon.type === 'image') return { type: 'image', blob: icon.blob || null, imageBitmap: icon.imageBitmap || null };
+  if (icon.type === 'svg-symbol') return { type: 'svg-symbol', symbolId: icon.symbolId };
+  return { type: 'emoji', value: icon.value || '❔' };
+}
+
+function cloneEventForRuntimeCache(ev) {
+  return {
+    ...ev,
+    icon: cloneEventIconForRuntimeCache(ev.icon),
+    entryIds: objectEntryIds(ev),
+  };
+}
+
+function cloneAnnotationForRuntimeCache(ann) {
+  return {
+    ...ann,
+    entryIds: objectEntryIds(ann),
+  };
+}
+
+function runtimeSettingsSnapshot() {
+  return {
+    brushSize: state.brush.sizeScreen,
+    brushMode: state.brush.mode,
+    currentLayer: state.currentLayer,
+    fogOpacity: state.fogOpacity,
+    terrainFogOpacity: state.terrainFogOpacity,
+    eventFogOpacity: state.eventFogOpacity,
+    terrainFogColor: state.terrainFogColor,
+    eventFogColor: state.eventFogColor,
+    grid: { ...state.grid },
+  };
+}
+
+function rememberSceneRuntime(sceneId) {
+  if (!sceneId || !state.hasMap || state.currentSceneId !== sceneId) return false;
+  if (!state.mapCanvas || !state.fogLayers.terrain.canvas || !state.fogLayers.event.canvas) return false;
+  state.sceneRuntimeCache.set(sceneId, {
+    mapCanvas: state.mapCanvas,
+    terrainCanvas: state.fogLayers.terrain.canvas,
+    eventCanvas: state.fogLayers.event.canvas,
+    mapFingerprint: state.mapFingerprint,
+    mapSize: { w: state.mapCanvas.width, h: state.mapCanvas.height },
+    tokens: state.tokens.map(cloneTokenForRuntimeCache),
+    events: state.events.map(cloneEventForRuntimeCache),
+    annotations: state.annotations.map(cloneAnnotationForRuntimeCache),
+    entries: normalizeEntries(state.entries),
+    revealZones: normalizeRevealZones(state.revealZones || [], state.entries),
+    view: { ...state.view },
+    settings: runtimeSettingsSnapshot(),
+    ts: Date.now(),
+  });
+  const limit = Math.max(1, Number(state.sceneRuntimeCacheLimit) || 3);
+  while (state.sceneRuntimeCache.size > limit) {
+    const oldest = state.sceneRuntimeCache.keys().next().value;
+    state.sceneRuntimeCache.delete(oldest);
+  }
+  return true;
+}
+
+function forgetSceneRuntime(sceneId) {
+  if (!sceneId) return;
+  state.sceneRuntimeCache.delete(sceneId);
+}
+
+function clearSceneRuntimeCache() {
+  state.sceneRuntimeCache.clear();
+}
+
+function restoreSceneFromRuntimeCache(sceneId, scene) {
+  const cached = state.sceneRuntimeCache.get(sceneId);
+  if (!cached || !scene) return false;
+  const expected = scene.mapSize || cached.mapSize;
+  const sizeOk = expected && cached.mapCanvas.width === expected.w && cached.mapCanvas.height === expected.h;
+  const fingerprintOk = !scene.mapFingerprint || !cached.mapFingerprint || scene.mapFingerprint === cached.mapFingerprint;
+  if (!sizeOk || !fingerprintOk) {
+    forgetSceneRuntime(sceneId);
+    return false;
+  }
+
+  if (state.mapImage && typeof state.mapImage.close === 'function') {
+    try { state.mapImage.close(); } catch (_) {}
+  }
+  state.mapCanvas = cached.mapCanvas;
+  state.fogLayers.terrain.canvas = cached.terrainCanvas;
+  state.fogLayers.event.canvas = cached.eventCanvas;
+  state.mapCtx = state.mapCanvas.getContext('2d');
+  state.fogLayers.terrain.ctx = state.fogLayers.terrain.canvas.getContext('2d', { willReadFrequently: true });
+  state.fogLayers.event.ctx = state.fogLayers.event.canvas.getContext('2d', { willReadFrequently: true });
+  state.mapImage = null;
+  state.hasMap = true;
+  invalidateGridCache();
+  clearAnnotationRuntimeResources();
+  state.tokens = cached.tokens.map(cloneTokenForRuntimeCache);
+  state.events = cached.events.map(cloneEventForRuntimeCache);
+  state.annotations = cached.annotations.map(cloneAnnotationForRuntimeCache);
+  state.entries = normalizeEntries(cached.entries || []);
+  state.revealZones = normalizeRevealZones(cached.revealZones || [], state.entries);
+  state.activeEntryId = null;
+  pruneEntryReferences();
+  clearSelection({ render: false });
+  applyRestoredView(cached.view, {});
+  if (cached.settings) {
+    state.brush.sizeScreen = cached.settings.brushSize;
+    state.brush.mode = cached.settings.brushMode;
+    state.currentLayer = cached.settings.currentLayer;
+    state.fogOpacity = cached.settings.fogOpacity;
+    state.terrainFogOpacity = cached.settings.terrainFogOpacity;
+    state.eventFogOpacity = cached.settings.eventFogOpacity;
+    state.terrainFogColor = cached.settings.terrainFogColor;
+    state.eventFogColor = cached.settings.eventFogColor;
+    state.grid = normalizeGridSettings(cached.settings.grid);
+  }
+  setBrushMode(state.brush.mode);
+  setLayer(state.currentLayer);
+  setBrushSize(state.brush.sizeScreen);
+  state.undoStack = [];
+  updateUndoButton();
+  updateTokensStatus(); updateEventsStatus(); updateAnnotationsStatus();
+  updateEntryButton();
+  refreshSelectionUi();
+  updateZoomStatus();
+  scheduleRender('all');
+  state.sceneRuntimeCache.delete(sceneId);
+  state.sceneRuntimeCache.set(sceneId, cached);
+  return true;
+}
+
 async function switchScene(targetId) {
   if (!state.scenes[targetId]) { showToast('场景不存在'); return; }
   if (targetId === state.currentSceneId) return;
@@ -4344,6 +4502,7 @@ async function switchScene(targetId) {
         createdAt: prev.createdAt || Date.now(),
         lastUsedAt: Date.now(),
       };
+      rememberSceneRuntime(state.currentSceneId);
     }
   }
   const target = state.scenes[targetId];
@@ -4351,22 +4510,30 @@ async function switchScene(targetId) {
   const prevHasMap = state.hasMap;
   setLoading('切换场景中…');
   try {
-    const preparedMap = await prepareSceneMapForRestore(target);
-    const preparedRestore = await prepareSavedRestore(target, { w: preparedMap.w, h: preparedMap.h });
-    const mapInfo = preparedMap;
-    commitPreparedMap(preparedMap);
-    state.mapFingerprint = target.mapFingerprint;
-    $('splash').style.display = 'none';
-    state.currentSceneId = targetId;
-    target.mapSize = { w: mapInfo.w, h: mapInfo.h };
-    const restored = await restoreFromSaved(target, { preparedRestore });
-    if (!restored) throw new Error('恢复场景数据失败');
+    const restoredFromRuntime = restoreSceneFromRuntimeCache(targetId, target);
+    if (restoredFromRuntime) {
+      state.mapFingerprint = target.mapFingerprint || state.mapFingerprint;
+      $('splash').style.display = 'none';
+      state.currentSceneId = targetId;
+    } else {
+      const preparedMap = await prepareSceneMapForRestore(target);
+      const preparedRestore = await prepareSavedRestore(target, { w: preparedMap.w, h: preparedMap.h });
+      const mapInfo = preparedMap;
+      commitPreparedMap(preparedMap);
+      state.mapFingerprint = target.mapFingerprint;
+      $('splash').style.display = 'none';
+      state.currentSceneId = targetId;
+      target.mapSize = { w: mapInfo.w, h: mapInfo.h };
+      const restored = await restoreFromSaved(target, { preparedRestore });
+      if (!restored) throw new Error('恢复场景数据失败');
+    }
+    target.lastUsedAt = Date.now();
     state.undoStack = [];
     updateUndoButton();
     fitView();
     setupBrushSizeFromState();
     updateSceneStatus();
-    triggerImmediateSave();
+    triggerImmediateSave({ skipActiveSceneSync: true });
     const suffix = sceneNeedsLocalMap(target) ? '（占位地图，需绑定地图）' : '';
     showToast('已切换到 "' + (target.name || '场景') + '"' + suffix, 2600);
   } catch (e) {
@@ -4383,6 +4550,7 @@ async function deleteScene(id) {
   if (!state.scenes[id]) return;
   const wasCurrent = (id === state.currentSceneId);
   delete state.scenes[id];
+  forgetSceneRuntime(id);
   if (wasCurrent) {
     // 按 lastUsedAt 倒序选最近用过的
     const remaining = Object.keys(state.scenes)
@@ -4810,7 +4978,6 @@ function moveGridCalibration(info, x, y) {
   invalidateGridCache();
   scheduleRender('all');
 }
-
 // ============== 渲染 ==============
 function scheduleRender(rectOrAll) {
   if (rectOrAll === 'all') state.dirtyRect = 'all';
@@ -5301,7 +5468,6 @@ function resizeMainCanvas() {
   state._dpr = dpr;
   scheduleRender('all');
 }
-
 // ============== 视口 ==============
 function fitView() {
   if (!state.hasMap) return;
@@ -8107,7 +8273,6 @@ function togglePlaceEventMode(force, preset = null) {
   // 进入时弹一次 toast 强调
   if (next && !prev) showToast(nextPreset === EVENT_ACTION_SCENE_LINK ? '放置场景转移点：点击地图添加，Esc 退出' : '放置事件模式：点击地图添加，Esc 退出', 3000);
 }
-
 // ============== Modal ==============
 function showModal(html, opts) {
   if (state.gridMaskSelection) cancelGridMaskSelection();
@@ -8153,6 +8318,7 @@ async function restoreSceneWithPreparedMap(sceneId, file, preparedMap, nextFinge
   const scene = state.scenes[sceneId];
   if (!scene) { showToast('场景不存在'); return; }
   try {
+    forgetSceneRuntime(sceneId);
     const preparedRestore = await prepareSavedRestore(scene, { w, h });
     commitPreparedMap(preparedMap);
     state.mapFingerprint = nextFingerprint;
@@ -8180,6 +8346,7 @@ async function restoreSceneWithPreparedMap(sceneId, file, preparedMap, nextFinge
 function resetSceneWithPreparedMap(sceneId, file, preparedMap, nextFingerprint, w, h) {
   const scene = state.scenes[sceneId];
   if (!scene) { showToast('场景不存在'); return; }
+  forgetSceneRuntime(sceneId);
   commitPreparedMap(preparedMap);
   state.mapFingerprint = nextFingerprint;
   scene.mapBlob = file;
@@ -8307,6 +8474,7 @@ async function loadMapFile(file) {
           createdAt: prev.createdAt || Date.now(),
           lastUsedAt: Date.now(),
         };
+        rememberSceneRuntime(state.currentSceneId);
       }
     } catch (_) {}
   }
@@ -8555,13 +8723,12 @@ function hideLoading() {
     cancelBtn.onclick = null;
   }
 }
-
 // ============== 云存档（v3.18.0） ==============
 const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.31.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.32.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -9357,6 +9524,7 @@ async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
   const nextScenes = {};
   for (const entry of preparedEntries) nextScenes[entry.newId] = entry.scene;
   state.scenes = nextScenes;
+  clearSceneRuntimeCache();
   state.currentSceneId = preferred.newId;
   state.mapFingerprint = preferred.scene.mapFingerprint || null;
   commitPreparedMap(preferred.preparedMap);
@@ -10646,7 +10814,6 @@ function cloudSync_bootstrap() {
     console.warn('cloudSync bootstrap failed:', err);
   });
 }
-
 // ============== 加载 Token 弹窗 ==============
 function openTokenUploadDialog(file, existingId) {
   state.uploadingTokenFile = file;
@@ -11187,7 +11354,6 @@ function openAnnotationEditDialog(annotationId) {
   if (ann.type === 'image') openImageAnnotationDialog(null, annotationId);
   else openTextAnnotationDialog(annotationId);
 }
-
 function eventQuickMatches(ev, query) {
   if (isSceneLinkEvent(ev)) return false;
   if (!query) return true;
@@ -11876,7 +12042,6 @@ function showCheckpointList() {
     }
   });
 }
-
 // ============== visibilitychange / hydrate ==============
 async function onVisibilityChange() {
   if (document.hidden) {
@@ -11955,6 +12120,7 @@ async function tryAutoLoadCurrentScene() {
   const main = await loadAndMigrateMain();
   if (!main) return;
   state.scenes = main.scenes || {};
+  clearSceneRuntimeCache();
   state.currentSceneId = main.currentSceneId || null;
   state.diceHistory = normalizeDiceHistory(main.diceHistory || []);
   state.diceLastExpression = state.diceHistory[0]?.expression || 'd20';
