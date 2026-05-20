@@ -247,9 +247,10 @@ button.icon { padding: 6px 10px; }
   gap: 8px;
 }
 
-/* ============== Token / 标注浮动操作条 ============== */
+/* ============== Token / 标注 / 网格框选浮动操作条 ============== */
 #token-action-bar,
-#annotation-action-bar {
+#annotation-action-bar,
+#grid-mask-action-bar {
   position: absolute;
   background: color-mix(in srgb, var(--theme-bg-panel) 95%, transparent);
   border: 1px solid var(--theme-border);
@@ -263,11 +264,19 @@ button.icon { padding: 6px 10px; }
   box-shadow: var(--theme-shadow-spread) var(--theme-shadow-color);
 }
 #token-action-bar.visible,
-#annotation-action-bar.visible { display: flex; }
+#annotation-action-bar.visible,
+#grid-mask-action-bar.visible { display: flex; }
 #token-action-bar input[type="range"],
 #annotation-action-bar input[type="range"] { width: 100px; }
 #token-action-bar button,
-#annotation-action-bar button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+#annotation-action-bar button,
+#grid-mask-action-bar button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+#grid-mask-action-bar .grid-mask-count {
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
 
 /* ============== 编辑态对象侧栏 ============== */
 #object-panel {
@@ -518,7 +527,7 @@ button.icon { padding: 6px 10px; }
 }
 .entry-manager-row {
   display: grid;
-  grid-template-columns: 34px minmax(120px, 1fr) 54px minmax(112px, 0.8fr) 84px 76px 64px;
+  grid-template-columns: 34px minmax(120px, 1fr) 54px minmax(100px, 0.7fr) minmax(112px, 0.8fr) 84px 76px 64px;
   gap: 8px;
   align-items: center;
   border: 1px solid var(--theme-border);
@@ -528,7 +537,7 @@ button.icon { padding: 6px 10px; }
 }
 .entry-manager-new-row {
   display: grid;
-  grid-template-columns: 1fr 54px minmax(112px, 0.8fr) auto;
+  grid-template-columns: 1fr 54px minmax(100px, 0.7fr) minmax(112px, 0.8fr) auto;
   gap: 8px;
 }
 .entry-hotkey-input {
@@ -536,7 +545,8 @@ button.icon { padding: 6px 10px; }
   text-align: center;
   font-weight: 700;
 }
-.entry-hotkey-action {
+.entry-hotkey-action,
+.entry-purpose-select {
   min-width: 0;
 }
 .entry-hotkey-action-badge {
@@ -615,6 +625,21 @@ button.icon { padding: 6px 10px; }
   display: flex; gap: 6px; justify-content: flex-end;
 }
 .event-card-actions button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.event-card-link {
+  border-top: 1px solid var(--theme-border);
+  margin: 8px 0 10px;
+  padding-top: 10px;
+}
+.event-card-link button {
+  width: 100%;
+  justify-content: center;
+}
+.event-card-link-meta {
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  margin-top: 6px;
+  text-align: center;
+}
 
 #top-hover-zone {
   position: absolute;
@@ -765,7 +790,8 @@ button.icon { padding: 6px 10px; }
 .form-row input[type="text"],
 .form-row textarea,
 .form-row select,
-.entry-hotkey-action {
+.entry-hotkey-action,
+.entry-purpose-select {
   width: 100%;
   background: var(--theme-bg-input);
   border: 1px solid var(--theme-border);
@@ -1678,7 +1704,8 @@ button.active .nav-ico,
 #reveal-zone-panel,
 #event-card,
 #token-action-bar,
-#annotation-action-bar {
+#annotation-action-bar,
+#grid-mask-action-bar {
   background: var(--t-surface);
   border-color: var(--t-border);
   border-radius: var(--t-panel-radius);
@@ -1776,9 +1803,10 @@ button.active .nav-ico,
   <div id="toolbar">
     <div class="toolbar-group toolbar-build-group">
       <button id="btn-load-map" class="top-command" data-surface="edit" title="加载地图图片"><span class="nav-ico">▰</span><span class="label-only">加载地图</span></button>
-      <button id="btn-load-token" class="top-command" data-surface="edit" title="添加 Token（玩家小队/NPC）"><span class="nav-ico">♟</span><span class="label-only">Token</span></button>
-      <button id="btn-place-event" class="top-command" data-surface="edit" title="添加事件（Shift+点击地图也可）"><span class="nav-ico">◆</span><span class="label-only">事件</span></button>
-      <button id="btn-add-text" class="top-command annotation-command" data-surface="edit" title="添加文字标注"><span class="nav-ico">文</span><span class="label-only">文字</span></button>
+    <button id="btn-load-token" class="top-command" data-surface="edit" title="添加 Token（玩家小队/NPC）"><span class="nav-ico">♟</span><span class="label-only">Token</span></button>
+    <button id="btn-place-event" class="top-command" data-surface="edit" title="添加事件（Shift+点击地图也可）"><span class="nav-ico">◆</span><span class="label-only">事件</span></button>
+    <button id="btn-place-scene-link" class="top-command" data-surface="edit" title="添加场景转移点"><span class="nav-ico">↪</span><span class="label-only">转移</span></button>
+    <button id="btn-add-text" class="top-command annotation-command" data-surface="edit" title="添加文字标注"><span class="nav-ico">文</span><span class="label-only">文字</span></button>
       <button id="btn-add-image" class="top-command annotation-command" data-surface="edit" title="添加图片标注"><span class="nav-ico">▧</span><span class="label-only">图片</span></button>
     </div>
     <div class="toolbar-divider" data-surface="edit"></div>
@@ -1805,7 +1833,7 @@ button.active .nav-ico,
     <button id="btn-undo" class="top-command" title="撤销 (Ctrl+Z)" disabled><span class="nav-ico">↶</span><span class="label-only">撤销</span></button>
     <div class="toolbar-divider"></div>
     <button id="btn-surface-toggle" class="top-command surface-toggle" title="切换跑团/编辑"><span class="nav-ico">⚙</span><span class="label-only">编辑</span></button>
-    <button id="btn-entry-spotlight" class="top-command" title="词条聚光"><span class="nav-ico">◇</span><span class="label-only">词条</span></button>
+    <button id="btn-entry-spotlight" class="top-command" title="词条动作"><span class="nav-ico">◇</span><span class="label-only">词条</span></button>
     <button id="btn-more" class="top-command more-command" title="更多"><span class="nav-ico">⋯</span><span class="label-only">更多</span></button>
   </div>
   <div id="canvas-container">
@@ -1821,6 +1849,7 @@ button.active .nav-ico,
     </div>
     <div id="token-action-bar"></div>
     <div id="annotation-action-bar"></div>
+    <div id="grid-mask-action-bar"></div>
     <aside id="object-panel" aria-label="对象列表"></aside>
     <div id="event-card"></div>
     <div id="top-hover-zone"></div>
@@ -1925,6 +1954,8 @@ const ANNOTATION_DEFAULT_TEXT_SIZE = 32;
 const ANNOTATION_DEFAULT_IMAGE_WIDTH = 180;
 const ANNOTATION_MIN_SIZE = 16;
 const ANNOTATION_MAX_SIZE = 1200;
+const EVENT_ACTION_NONE = 'none';
+const EVENT_ACTION_SCENE_LINK = 'scene-link';
 const DICE_HISTORY_LIMIT = 20;
 const DICE_MAX_TERMS = 20;
 const DICE_MAX_COUNT = 100;
@@ -2033,11 +2064,13 @@ const state = {
   events: [],
   selectedEventId: null,
   placeEventMode: false,
+  placeEventPreset: null,
   eventCardOpenId: null,
   entries: [],
-  activeEntryId: null, // 运行态，不持久化、不导出；只控制当前现场聚光
+  activeEntryId: null, // 旧词条聚光运行态；v3.28 起快捷键不再设置，仅保留旧 UI 状态兜底
   revealZones: [],
   revealZoneDraft: null,
+  gridMaskSelection: null,
   diceHistory: [],
   diceLastExpression: 'd20',
   dicePanelOpen: false,
@@ -2254,6 +2287,10 @@ function gridCellBounds(cell, grid) {
 }
 function gridCellKey(cell) {
   return cell.type === 'square' ? `square:${cell.col},${cell.row}` : `hex:${cell.q},${cell.r}`;
+}
+function rectsOverlap(a, b) {
+  return a.x <= b.x + b.w && a.x + a.w >= b.x &&
+    a.y <= b.y + b.h && a.y + a.h >= b.y;
 }
 
 function showToast(msg, ms = 2200) {
@@ -2485,6 +2522,7 @@ function setSurfaceMode(mode) {
   const next = mode === 'edit' ? 'edit' : 'live';
   if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
   if (state.uiMode === 'modal') { showToast('请先关闭当前弹窗'); return; }
+  if (state.gridMaskSelection) cancelGridMaskSelection();
   state.surfaceMode = next;
   if (next === 'live') {
     if (state.placeEventMode) togglePlaceEventMode(false);
@@ -2549,6 +2587,7 @@ function getSelectedObject() {
 }
 
 function setSelectedObject(kind, id, opts = {}) {
+  if (state.gridMaskSelection) cancelGridMaskSelection();
   state.selectedTokenId = kind === 'token' ? id : null;
   state.selectedAnnotationId = kind === 'annotation' ? id : null;
   state.selectedEventId = kind === 'event' ? id : null;
@@ -2618,7 +2657,37 @@ function normalizeEntryHotkeyAction(action) {
 }
 
 function entryHotkeyActionLabel(action) {
-  return normalizeEntryHotkeyAction(action) === 'reveal-zones' ? '切换区域显示' : '聚光';
+  return normalizeEntryHotkeyAction(action) === 'reveal-zones' ? '切换区域显示' : '切换事件上层';
+}
+
+function normalizeEntryPurpose(purpose) {
+  return purpose === 'reveal-zone' || purpose === 'spotlight' || purpose === 'both' ? purpose : 'both';
+}
+
+function entryPurposeLabel(purpose) {
+  const clean = normalizeEntryPurpose(purpose);
+  if (clean === 'reveal-zone') return '揭示区域';
+  if (clean === 'spotlight') return '事件显露';
+  return '两者都用';
+}
+
+function entryCanSpotlight(entry) {
+  const purpose = normalizeEntryPurpose(entry?.purpose);
+  return purpose === 'spotlight' || purpose === 'both';
+}
+
+function entryCanRevealZone(entry) {
+  const purpose = normalizeEntryPurpose(entry?.purpose);
+  return purpose === 'reveal-zone' || purpose === 'both';
+}
+
+function entryPurposeOptionsHTML(current) {
+  const cur = normalizeEntryPurpose(current);
+  return `
+    <option value="reveal-zone"${cur === 'reveal-zone' ? ' selected' : ''}>揭示区域</option>
+    <option value="spotlight"${cur === 'spotlight' ? ' selected' : ''}>事件显露</option>
+    <option value="both"${cur === 'both' ? ' selected' : ''}>两者都用</option>
+  `;
 }
 
 function normalizeEntryIdsForEntries(value, entries) {
@@ -2671,6 +2740,7 @@ function normalizeEntries(entries) {
     out.push({
       id,
       name,
+      purpose: normalizeEntryPurpose(raw?.purpose),
       hotkey,
       hotkeyAction: normalizeEntryHotkeyAction(raw?.hotkeyAction),
       color: normalizeHex(raw?.color || ENTRY_COLORS[out.length % ENTRY_COLORS.length]),
@@ -2698,6 +2768,7 @@ function objectHasEntry(item, entryId) {
 }
 
 function objectHasActiveEntry(item) {
+  if (!entryCanSpotlight(getEntryById(state.activeEntryId))) return false;
   return objectHasEntry(item, state.activeEntryId);
 }
 
@@ -2740,6 +2811,7 @@ function createEntry(name, opts = {}) {
   const entry = {
     id: uuid(),
     name: cleanName,
+    purpose: normalizeEntryPurpose(opts.purpose),
     hotkey,
     hotkeyAction: normalizeEntryHotkeyAction(opts.hotkeyAction),
     color: normalizeHex(opts.color || ENTRY_COLORS[(state.entries || []).length % ENTRY_COLORS.length]),
@@ -2840,11 +2912,14 @@ function revealZoneEntryNames(zone) {
 
 function revealZonesForEntry(entryId) {
   if (!entryId) return [];
+  const entry = getEntryById(entryId);
+  if (!entryCanRevealZone(entry)) return [];
   return (state.revealZones || []).filter((zone) => objectEntryIds(zone).includes(entryId));
 }
 
 function setActiveEntry(entryId) {
-  const next = getEntryById(entryId) ? entryId : null;
+  const entry = getEntryById(entryId);
+  const next = entry && entryCanSpotlight(entry) ? entryId : null;
   state.activeEntryId = next;
   updateEntryButton();
   updateObjectPanel();
@@ -2871,10 +2946,11 @@ function entryChipsHTML(entryIds) {
   }).join('');
 }
 
-function entryAssignmentHTML(selectedIds) {
+function entryAssignmentHTML(selectedIds, opts = {}) {
   const ids = new Set(normalizeEntryIds(selectedIds));
+  const defaultPurpose = normalizeEntryPurpose(opts.defaultPurpose);
   const chips = (state.entries || []).map((entry) => `
-    <button type="button" class="entry-pick${ids.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}">${escapeHtml(entryDisplayName(entry))}</button>
+    <button type="button" class="entry-pick${ids.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}" title="${escapeHtml(entryPurposeLabel(entry.purpose))}">${escapeHtml(entryDisplayName(entry))}</button>
   `).join('');
   return `
     <div class="form-row">
@@ -2884,6 +2960,7 @@ function entryAssignmentHTML(selectedIds) {
         <div class="entry-new-row">
           <input id="entry-new-name" type="text" maxlength="40" placeholder="新建词条">
           <input id="entry-new-hotkey" class="entry-hotkey-input" type="text" maxlength="1" placeholder="键">
+          <select id="entry-new-purpose" class="entry-purpose-select" title="词条用途">${entryPurposeOptionsHTML(defaultPurpose)}</select>
           <button id="entry-new-add" type="button">新建</button>
         </div>
       </div>
@@ -2891,13 +2968,14 @@ function entryAssignmentHTML(selectedIds) {
   `;
 }
 
-function mountEntryAssignmentControl(initialIds) {
+function mountEntryAssignmentControl(initialIds, opts = {}) {
   const selected = new Set(normalizeEntryIds(initialIds));
+  const defaultPurpose = normalizeEntryPurpose(opts.defaultPurpose);
   const render = () => {
     const box = $('entry-picker-chips');
     if (!box) return;
     box.innerHTML = (state.entries || []).map((entry) => `
-      <button type="button" class="entry-pick${selected.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}">${escapeHtml(entryDisplayName(entry))}</button>
+      <button type="button" class="entry-pick${selected.has(entry.id) ? ' selected' : ''}" data-entry-id="${escapeHtml(entry.id)}" style="--entry-color:${escapeHtml(entry.color)}" title="${escapeHtml(entryPurposeLabel(entry.purpose))}">${escapeHtml(entryDisplayName(entry))}</button>
     `).join('') || '<span class="object-empty" style="padding:4px 0;text-align:left;">暂无词条</span>';
     box.querySelectorAll('.entry-pick').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -2912,14 +2990,17 @@ function mountEntryAssignmentControl(initialIds) {
   const addBtn = $('entry-new-add');
   const input = $('entry-new-name');
   const hotkeyInput = $('entry-new-hotkey');
+  const purposeInput = $('entry-new-purpose');
   bindEntryHotkeyInput(hotkeyInput);
+  if (purposeInput) purposeInput.value = defaultPurpose;
   if (addBtn && input) {
     const add = () => {
-      const entry = createEntry(input.value, { hotkey: hotkeyInput?.value });
+      const entry = createEntry(input.value, { hotkey: hotkeyInput?.value, purpose: purposeInput?.value || defaultPurpose });
       if (!entry) return;
       selected.add(entry.id);
       input.value = '';
       if (hotkeyInput) hotkeyInput.value = '';
+      if (purposeInput) purposeInput.value = defaultPurpose;
       render();
     };
     addBtn.addEventListener('click', add);
@@ -2938,9 +3019,11 @@ function mountEntryAssignmentControl(initialIds) {
 function objectMaskLabel(kind, item) {
   if (objectHasActiveEntry(item)) {
     const entry = getEntryById(state.activeEntryId);
-    return `词条聚光：${entry ? entry.name : '已激活'}`;
+    return `词条动作：${entry ? entry.name : '已激活'}`;
   }
-  if (kind === 'event') return item.layer === 0 ? '公开事件' : '受事件雾';
+  if (kind === 'event') return isSceneLinkEvent(item)
+    ? `场景转移 · ${sceneLinkTargetName(item)}`
+    : (item.layer === 0 ? '公开事件' : '受事件雾');
   if (kind === 'annotation') {
     const mode = normalizeAnnotationMaskMode(item.maskMode);
     if (mode === 'terrain') return isAnnotationVisible(item) ? '受地形雾 · 可见' : '受地形雾 · 被遮挡';
@@ -3001,7 +3084,7 @@ function getFilteredObjectPanelItems() {
     : 'all';
   const query = String(state.objectPanelQuery || '').trim().toLowerCase();
   const itemsAll = [
-    ...state.events.map((item) => ({ kind: 'event', item })),
+    ...state.events.filter((item) => !isSceneLinkEvent(item)).map((item) => ({ kind: 'event', item })),
     ...state.tokens.map((item) => ({ kind: 'token', item })),
     ...state.annotations.map((item) => ({ kind: 'annotation', item })),
   ];
@@ -3683,6 +3766,7 @@ async function serializeActiveSceneData() {
     title: ev.title, content: ev.content, size: ev.size, zOrder: ev.zOrder,
     layer: (ev.layer === 0 ? 0 : 1),
     entryIds: objectEntryIds(ev),
+    ...serializeEventAction(ev),
   }));
   const annotationsSerialized = state.annotations.map(serializeAnnotation);
   const revealZonesSerialized = normalizeRevealZones(state.revealZones, state.entries);
@@ -3847,6 +3931,7 @@ async function serializeSceneForBundle(sceneId, scene, opts = {}) {
       title: ev.title, content: ev.content, size: ev.size, zOrder: ev.zOrder,
       layer: (ev.layer === 0 ? 0 : 1),
       entryIds: normalizeEntryIdsForEntries(ev.entryIds || [], sceneEntries),
+      ...serializeEventAction(ev),
     };
   }));
   const annotationsExported = await Promise.all((scene.annotations || []).map(async (ann) => {
@@ -3949,7 +4034,12 @@ async function bundleScenePayloadToSaved(scenePayload) {
     const icon = ev.icon || { type: 'emoji', value: '❓' };
     let restoredIcon = icon;
     if (icon.type === 'image') restoredIcon = { type: 'image', blob: await base64ToBlob(icon.blob) };
-    return { ...ev, icon: restoredIcon, entryIds: normalizeEntryIdsForEntries(ev.entryIds || [], entries) };
+    return {
+      ...ev,
+      icon: restoredIcon,
+      entryIds: normalizeEntryIdsForEntries(ev.entryIds || [], entries),
+      ...serializeEventAction(ev),
+    };
   }));
   const annotations = await Promise.all((scenePayload.annotations || []).map(async (ann) => {
     const base = { ...ann, entryIds: normalizeEntryIdsForEntries(ann.entryIds || [], entries) };
@@ -4067,6 +4157,11 @@ async function doImportSceneBundle(payload, selectedFiles) {
       });
     }
     if (!preparedEntries.length) throw new Error('没有选择可导入的场景');
+    const sceneIdMap = new Map();
+    preparedEntries.forEach((entry) => {
+      if (entry.scene.importedFromSceneId) sceneIdMap.set(entry.scene.importedFromSceneId, entry.newId);
+    });
+    preparedEntries.forEach((entry) => remapEventSceneLinksInScene(entry.scene, sceneIdMap));
     const preferred = preparedEntries.find((entry) => entry.scene.importedFromSceneId && entry.scene.importedFromSceneId === payload.currentSceneId)
       || preparedEntries[0];
     const preferredPreparedRestore = await prepareSavedRestore(preferred.scene, preferred.scene.mapSize);
@@ -4181,7 +4276,12 @@ async function doImportProject(payload) {
       } else {
         restoredIcon = icon;
       }
-      return { ...ev, icon: restoredIcon, entryIds: normalizeEntryIdsForEntries(ev.entryIds || [], entries) };
+      return {
+        ...ev,
+        icon: restoredIcon,
+        entryIds: normalizeEntryIdsForEntries(ev.entryIds || [], entries),
+        ...serializeEventAction(ev),
+      };
     }));
     const annotationsRestored = await Promise.all((payload.annotations || []).map(async (ann) => {
       const base = { ...ann, entryIds: normalizeEntryIdsForEntries(ann.entryIds || [], entries) };
@@ -4743,6 +4843,7 @@ function renderFrame() {
   state.dirtyRect = null;
   positionTokenActionBar();
   positionAnnotationActionBar();
+  positionGridMaskActionBar();
   positionEventCard();
 }
 
@@ -4779,12 +4880,12 @@ function drawAll() {
   drawAllAnnotations(ctx, 'public');
   setScreenTransform();
   drawAllEvents(ctx, 0);
-  drawEntrySpotlightEvents(ctx);
 
   // 6. 网格线 overlay（v3.1，地图坐标系，token 之下）
   setMapTransform();
   drawGridOverlay(ctx);
   drawRevealZoneOverlays(ctx);
+  drawGridMaskSelectionOverlay(ctx);
 
   // 7. Token（最上层，永远可见）
   drawTokens(ctx);
@@ -4912,6 +5013,32 @@ function drawAllEvents(ctx, layerFilter) {
       return a.zOrder - b.zOrder;
     });
   for (const ev of sorted) drawEventIcon(ctx, ev);
+}
+
+function eventsForEntry(entryId) {
+  if (!entryId) return [];
+  const entry = getEntryById(entryId);
+  if (!entryCanSpotlight(entry)) return [];
+  return (state.events || []).filter((ev) => objectEntryIds(ev).includes(entryId));
+}
+
+async function toggleEventsForEntryId(entryId) {
+  const entry = getEntryById(entryId);
+  const events = eventsForEntry(entryId);
+  if (!entry || !events.length) {
+    showToast('当前词条没有绑定事件', 1800);
+    return 0;
+  }
+  const shouldPromote = events.some((ev) => ev.layer !== 0);
+  for (const ev of events) {
+    await modifyEvent(ev.id, { layer: shouldPromote ? 0 : 1 });
+  }
+  state.activeEntryId = null;
+  updateEntryButton();
+  refreshSelectionUi();
+  const action = shouldPromote ? '显露到遮罩上层' : '放回事件遮罩下';
+  showToast(`已将 ${events.length} 个「${entry.name}」事件${action}`, 1800);
+  return events.length;
 }
 
 function drawEventIcon(ctx, ev) {
@@ -5468,6 +5595,282 @@ function paintGridCellAt(sx, sy) {
   scheduleRender(dirty);
 }
 
+function captureGridCellTiles(stroke, cell, grid, layerKeys) {
+  const bounds = gridCellBounds(cell, grid);
+  const minX = bounds.x, maxX = bounds.x + bounds.w;
+  const minY = bounds.y, maxY = bounds.y + bounds.h;
+  if (maxX < 0 || minX > state.mapCanvas.width) return null;
+  if (maxY < 0 || minY > state.mapCanvas.height) return null;
+  const minTx = Math.max(0, Math.floor(minX / TILE_SIZE));
+  const maxTx = Math.min(Math.floor((state.mapCanvas.width - 1) / TILE_SIZE), Math.floor(maxX / TILE_SIZE));
+  const minTy = Math.max(0, Math.floor(minY / TILE_SIZE));
+  const maxTy = Math.min(Math.floor((state.mapCanvas.height - 1) / TILE_SIZE), Math.floor(maxY / TILE_SIZE));
+  for (let ty = minTy; ty <= maxTy; ty++) {
+    for (let tx = minTx; tx <= maxTx; tx++) {
+      const rx = tx * TILE_SIZE, ry = ty * TILE_SIZE;
+      const rw = Math.min(TILE_SIZE, state.mapCanvas.width - rx);
+      const rh = Math.min(TILE_SIZE, state.mapCanvas.height - ry);
+      if (rw > 0 && rh > 0) {
+        captureStrokeTile(stroke, tx, ty, { x: rx, y: ry, w: rw, h: rh }, layerKeys);
+      }
+    }
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+function paintGridCellIntoStroke(stroke, cell, grid) {
+  const layerKeys = getStrokeLayerKeys(stroke);
+  const dirty = captureGridCellTiles(stroke, cell, grid, layerKeys);
+  if (!dirty) return false;
+  for (const layerKey of layerKeys) {
+    const ctx = state.fogLayers[layerKey].ctx;
+    ctx.save();
+    gridCellPath(ctx, cell, grid);
+    if (stroke.mode === 'reveal' || stroke.mode === 'reveal-all') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = '#000';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = layerFogColor(layerKey);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+  if (!stroke.bounds) stroke.bounds = { ...dirty };
+  else mergeRectInto(stroke.bounds, dirty);
+  return true;
+}
+
+function screenSelectionRectToMapRect(sel) {
+  const screenToMapWithView = (sx, sy) => [(sx - sel.view.x) / sel.view.scale, (sy - sel.view.y) / sel.view.scale];
+  const a = screenToMapWithView(sel.startX, sel.startY);
+  const b = screenToMapWithView(sel.currentX, sel.currentY);
+  const x = Math.min(a[0], b[0]);
+  const y = Math.min(a[1], b[1]);
+  const w = Math.abs(a[0] - b[0]);
+  const h = Math.abs(a[1] - b[1]);
+  const minSize = 2 / Math.max(sel.view.scale || 1, 0.1);
+  return {
+    x: x - minSize / 2,
+    y: y - minSize / 2,
+    w: Math.max(w, minSize),
+    h: Math.max(h, minSize),
+  };
+}
+
+function mapRectForCellEnumeration(rect, grid) {
+  const type = normalizeGridType(grid.type);
+  const rotation = normalizeGridRotationForType(type, grid.rotation || 0);
+  const pad = Math.max(grid.cellSize * 2.2, 2);
+  const corners = [
+    [rect.x, rect.y],
+    [rect.x + rect.w, rect.y],
+    [rect.x, rect.y + rect.h],
+    [rect.x + rect.w, rect.y + rect.h],
+  ].map(([x, y]) => rotateAroundOrigin(x, y, grid.offsetX, grid.offsetY, -rotation * Math.PI / 180));
+  const xs = corners.map((p) => p[0]);
+  const ys = corners.map((p) => p[1]);
+  return {
+    x: Math.min(...xs) - pad,
+    y: Math.min(...ys) - pad,
+    w: Math.max(...xs) - Math.min(...xs) + pad * 2,
+    h: Math.max(...ys) - Math.min(...ys) + pad * 2,
+  };
+}
+
+function collectGridCellsInMapRect(rect, grid) {
+  if (!grid || !grid.enabled || rect.w <= 0 || rect.h <= 0) return [];
+  const g = normalizeGridSettings(grid);
+  const enumRect = mapRectForCellEnumeration(rect, g);
+  const cells = [];
+  const seen = new Set();
+  if (g.type === 'square') {
+    const colMin = Math.floor((enumRect.x - g.offsetX) / g.cellSize) - 1;
+    const colMax = Math.ceil((enumRect.x + enumRect.w - g.offsetX) / g.cellSize) + 1;
+    const rowMin = Math.floor((enumRect.y - g.offsetY) / g.cellSize) - 1;
+    const rowMax = Math.ceil((enumRect.y + enumRect.h - g.offsetY) / g.cellSize) + 1;
+    for (let row = rowMin; row <= rowMax; row++) {
+      for (let col = colMin; col <= colMax; col++) {
+        const cell = { type: 'square', col, row };
+        const key = gridCellKey(cell);
+        if (seen.has(key)) continue;
+        if (!rectsOverlap(gridCellBounds(cell, g), rect)) continue;
+        seen.add(key);
+        cells.push(cell);
+      }
+    }
+  } else {
+    const rMin = Math.floor((enumRect.y - g.offsetY) / (g.cellSize * 1.5)) - 3;
+    const rMax = Math.ceil((enumRect.y + enumRect.h - g.offsetY) / (g.cellSize * 1.5)) + 3;
+    const qMin = Math.floor((enumRect.x - g.offsetX) / (g.cellSize * SQRT3) - rMax / 2) - 3;
+    const qMax = Math.ceil((enumRect.x + enumRect.w - g.offsetX) / (g.cellSize * SQRT3) - rMin / 2) + 3;
+    for (let r = rMin; r <= rMax; r++) {
+      for (let q = qMin; q <= qMax; q++) {
+        const cell = { type: 'hex', q, r };
+        const key = gridCellKey(cell);
+        if (seen.has(key)) continue;
+        if (!rectsOverlap(gridCellBounds(cell, g), rect)) continue;
+        seen.add(key);
+        cells.push(cell);
+      }
+    }
+  }
+  return cells;
+}
+
+function updateGridMaskSelectionCells(selection) {
+  if (!selection) return;
+  const rect = screenSelectionRectToMapRect(selection);
+  const cells = collectGridCellsInMapRect(rect, selection.grid);
+  selection.mapRect = rect;
+  selection.cells = cells;
+  selection.cellKeys = new Set(cells.map(gridCellKey));
+}
+
+function beginGridMaskSelection(info, sx, sy) {
+  if (!state.grid || !state.grid.enabled || !isEditSurface()) return false;
+  if (state.placeEventMode) return false;
+  const [mx, my] = screenToMap(sx, sy);
+  if (!insideMap(mx, my)) return false;
+  hideGridMaskActionBar();
+  state.gridMaskSelection = {
+    pointerId: info.id,
+    startX: sx,
+    startY: sy,
+    currentX: sx,
+    currentY: sy,
+    grid: normalizeGridSettings(state.grid),
+    view: { x: state.view.x, y: state.view.y, scale: state.view.scale },
+    cells: [],
+    cellKeys: new Set(),
+    mapRect: { x: mx, y: my, w: 0, h: 0 },
+    finalized: false,
+  };
+  info.role = 'grid-mask-select';
+  state.showBrushPreview = false;
+  updateGridMaskSelectionCells(state.gridMaskSelection);
+  scheduleRender('all');
+  return true;
+}
+
+function updateGridMaskSelection(x, y) {
+  const selection = state.gridMaskSelection;
+  if (!selection) return;
+  selection.currentX = x;
+  selection.currentY = y;
+  updateGridMaskSelectionCells(selection);
+  hideGridMaskActionBar();
+  scheduleRender('all');
+}
+
+function finishGridMaskSelection(info) {
+  const selection = state.gridMaskSelection;
+  if (!selection || selection.pointerId !== info.id) return;
+  selection.finalized = true;
+  updateGridMaskSelectionCells(selection);
+  if (!selection.cells.length) {
+    cancelGridMaskSelection();
+    return;
+  }
+  updateGridMaskActionBar();
+  scheduleRender('all');
+}
+
+function cancelGridMaskSelection() {
+  state.gridMaskSelection = null;
+  hideGridMaskActionBar();
+  scheduleRender('all');
+}
+
+function applyGridMaskSelection(layer, mode) {
+  const selection = state.gridMaskSelection;
+  if (!selection || !selection.cells.length) return;
+  if (state.activeStroke) onStrokeEnd(false);
+  const stroke = { layer, mode, affectedTiles: new Map(), bounds: null };
+  let painted = false;
+  for (const cell of selection.cells) {
+    if (paintGridCellIntoStroke(stroke, cell, selection.grid)) painted = true;
+  }
+  state.gridMaskSelection = null;
+  hideGridMaskActionBar();
+  if (!painted || stroke.affectedTiles.size === 0) {
+    scheduleRender('all');
+    return;
+  }
+  pushUndo({ type: 'fog', kind: 'tiles', layer: stroke.layer, tiles: [...stroke.affectedTiles.values()] });
+  state.strokesSinceCheckpoint += 1;
+  maybeCheckpoint();
+  refreshSelectionUi();
+  triggerImmediateSave();
+  scheduleRender(stroke.bounds || 'all');
+  const layerText = layer === 'all' ? '双层' : (layer === 'terrain' ? '地形层' : '事件层');
+  showToast(`已${mode === 'cover' ? '覆盖' : '揭示'} ${selection.cells.length} 格（${layerText}）`, 1600);
+}
+
+function drawGridMaskSelectionOverlay(ctx) {
+  const selection = state.gridMaskSelection;
+  if (!selection) return;
+  const cells = selection.cells || [];
+  if (!cells.length) return;
+  ctx.save();
+  ctx.fillStyle = state.brush.mode === 'cover' ? 'rgba(239, 68, 68, 0.28)' : 'rgba(214, 174, 92, 0.28)';
+  ctx.strokeStyle = state.brush.mode === 'cover' ? 'rgba(255, 210, 210, 0.95)' : 'rgba(255, 242, 199, 0.95)';
+  ctx.lineWidth = Math.max(1, 1 / Math.max(state.view.scale || 1, 0.1));
+  for (const cell of cells) {
+    ctx.beginPath();
+    gridCellPath(ctx, cell, selection.grid);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function hideGridMaskActionBar() {
+  const bar = $('grid-mask-action-bar');
+  if (!bar) return;
+  bar.classList.remove('visible');
+  bar.innerHTML = '';
+}
+
+function updateGridMaskActionBar() {
+  const selection = state.gridMaskSelection;
+  const bar = $('grid-mask-action-bar');
+  if (!bar || !selection || !selection.finalized || !selection.cells.length) {
+    hideGridMaskActionBar();
+    return;
+  }
+  const currentLabel = state.currentLayer === 'terrain' ? '地形' : '事件';
+  bar.innerHTML = `
+    <span class="grid-mask-count">${selection.cells.length} 格</span>
+    <button id="grid-mask-reveal-current" type="button">揭 ${currentLabel}</button>
+    <button id="grid-mask-cover-current" type="button">盖 ${currentLabel}</button>
+    <button id="grid-mask-reveal-all" type="button">全揭</button>
+    <button id="grid-mask-cover-all" type="button">全盖</button>
+    <button id="grid-mask-cancel" type="button">取消</button>
+  `;
+  $('grid-mask-reveal-current').onclick = () => applyGridMaskSelection(state.currentLayer, 'reveal');
+  $('grid-mask-cover-current').onclick = () => applyGridMaskSelection(state.currentLayer, 'cover');
+  $('grid-mask-reveal-all').onclick = () => applyGridMaskSelection('all', 'reveal-all');
+  $('grid-mask-cover-all').onclick = () => applyGridMaskSelection('all', 'cover');
+  $('grid-mask-cancel').onclick = cancelGridMaskSelection;
+  bar.classList.add('visible');
+  positionGridMaskActionBar();
+}
+
+function positionGridMaskActionBar() {
+  const selection = state.gridMaskSelection;
+  const bar = $('grid-mask-action-bar');
+  if (!bar || !selection || !bar.classList.contains('visible')) return;
+  const container = state.mainCanvas.parentElement;
+  const width = container?.clientWidth || state.mainCanvas.clientWidth || 1;
+  const height = container?.clientHeight || state.mainCanvas.clientHeight || 1;
+  const sx = Math.max(8, Math.min(width - 8, selection.currentX));
+  const sy = Math.max(8, Math.min(height - 8, selection.currentY));
+  bar.style.left = sx + 'px';
+  bar.style.top = sy + 'px';
+  bar.style.transform = 'translate(-50%, calc(-100% - 12px))';
+}
+
 // 网格线渲染（地图坐标系下叠加；用 offscreen 缓存避免每帧重画上千格）
 function getGridCache(mw, mh) {
   const g = state.grid;
@@ -5960,6 +6363,8 @@ async function undo() {
       ev.icon = await deserializeEventIcon(entry.before.icon);
       ev.size = entry.before.size;
       ev.layer = (entry.before.layer === 0 ? 0 : 1);
+      ev.entryIds = cleanEntryIds(entry.before.entryIds || []);
+      Object.assign(ev, serializeEventAction(entry.before));
     }
   } else if (entry.type === 'event-move') {
     const ev = state.events.find((e) => e.id === entry.id);
@@ -6043,6 +6448,7 @@ function clearFogLayer(layerKey) {
 
 function applyFillAll(layerKey) {
   if (!requireEditSurface()) return;
+  if (state.gridMaskSelection) cancelGridMaskSelection();
   fillFogLayer(layerKey);
   // 清空与该层相关的 fog 撤销项
   state.undoStack = state.undoStack.filter((e) => !(e.type === 'fog' && (e.layer === layerKey || e.layer === 'all')));
@@ -6054,6 +6460,7 @@ function applyFillAll(layerKey) {
 
 function applyClearAll(layerKey) {
   if (!requireEditSurface()) return;
+  if (state.gridMaskSelection) cancelGridMaskSelection();
   clearFogLayer(layerKey);
   state.undoStack = state.undoStack.filter((e) => !(e.type === 'fog' && (e.layer === layerKey || e.layer === 'all')));
   updateUndoButton();
@@ -6382,7 +6789,7 @@ function hitTestAnnotation(ann, mx, my) {
 function findTopAnnotationAt(mx, my) {
   const sorted = state.annotations.slice().sort((a, b) => (b.zOrder || 0) - (a.zOrder || 0));
   for (const ann of sorted) {
-    if (!isAnnotationVisible(ann)) continue;
+    if (!isEditSurface() && !isAnnotationVisible(ann)) continue;
     if (hitTestAnnotation(ann, mx, my)) return ann;
   }
   return null;
@@ -6578,7 +6985,7 @@ function updateAnnotationActionBar() {
   const bar = $('annotation-action-bar');
   if (!bar) return;
   const ann = state.annotations.find((a) => a.id === state.selectedAnnotationId);
-  if (!ann || !isEditSurface() || !isAnnotationVisible(ann)) {
+  if (!ann || !isEditSurface()) {
     bar.classList.remove('visible');
     bar.innerHTML = '';
     return;
@@ -6639,8 +7046,63 @@ function nextEventZOrder() {
   return state.events.reduce((m, e) => Math.max(m, e.zOrder), 0) + 1;
 }
 
+function normalizeEventActionType(value) {
+  return value === EVENT_ACTION_SCENE_LINK ? EVENT_ACTION_SCENE_LINK : EVENT_ACTION_NONE;
+}
+
+function normalizeEventActionLabel(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+
+function normalizeEventTargetSceneId(value) {
+  const id = String(value || '').trim();
+  return id && state.scenes && state.scenes[id] ? id : null;
+}
+
+function isSceneLinkEvent(ev) {
+  return normalizeEventActionType(ev?.actionType) === EVENT_ACTION_SCENE_LINK;
+}
+
+function sceneLinkTargetName(ev) {
+  const id = ev?.targetSceneId || '';
+  return (id && state.scenes && state.scenes[id]?.name) ? state.scenes[id].name : '目标场景缺失';
+}
+
+function eventActionSceneOptionsHTML(selectedId = '') {
+  const entries = Object.entries(state.scenes || {});
+  if (!entries.length) return '<option value="">还没有其他场景</option>';
+  return entries
+    .map(([id, scene]) => `<option value="${escapeHtml(id)}"${selectedId === id ? ' selected' : ''}>${escapeHtml(scene.name || '场景')}</option>`)
+    .join('');
+}
+
+function sceneLinkButtonLabel(ev) {
+  return normalizeEventActionLabel(ev?.actionLabel) || `前往：${sceneLinkTargetName(ev)}`;
+}
+
+function serializeEventAction(ev) {
+  const actionType = normalizeEventActionType(ev?.actionType);
+  if (actionType !== EVENT_ACTION_SCENE_LINK) {
+    return { actionType: EVENT_ACTION_NONE, targetSceneId: null, actionLabel: '' };
+  }
+  return {
+    actionType,
+    targetSceneId: ev?.targetSceneId || null,
+    actionLabel: normalizeEventActionLabel(ev?.actionLabel),
+  };
+}
+
+function remapEventSceneLinksInScene(scene, sceneIdMap) {
+  if (!scene || !Array.isArray(scene.events) || !(sceneIdMap instanceof Map)) return;
+  scene.events.forEach((ev) => {
+    if (!isSceneLinkEvent(ev) || !ev.targetSceneId) return;
+    ev.targetSceneId = sceneIdMap.get(ev.targetSceneId) || ev.targetSceneId;
+  });
+}
+
 function createEvent(opts) {
   // opts: { x, y, icon, title, content, layer, entryIds }
+  const actionType = normalizeEventActionType(opts.actionType);
   const ev = {
     id: uuid(),
     x: clamp(opts.x, 0, state.mapCanvas.width),
@@ -6652,6 +7114,9 @@ function createEvent(opts) {
     zOrder: nextEventZOrder(),
     layer: (opts.layer === 0 ? 0 : 1),  // 0 = 永远可见；1 = 被事件 fog 遮（默认）
     entryIds: normalizeEntryIds(opts.entryIds || []),
+    actionType,
+    targetSceneId: actionType === EVENT_ACTION_SCENE_LINK ? normalizeEventTargetSceneId(opts.targetSceneId) : null,
+    actionLabel: actionType === EVENT_ACTION_SCENE_LINK ? normalizeEventActionLabel(opts.actionLabel) : '',
   };
   state.events.push(ev);
   setSelectedObject('event', ev.id, { render: false });
@@ -6691,14 +7156,25 @@ async function modifyEvent(id, changes) {
   if (changes.size !== undefined) ev.size = changes.size;
   if (changes.layer !== undefined) ev.layer = (changes.layer === 0 ? 0 : 1);
   if (changes.entryIds !== undefined) ev.entryIds = normalizeEntryIds(changes.entryIds);
+  if (changes.actionType !== undefined || changes.targetSceneId !== undefined || changes.actionLabel !== undefined) {
+    const actionType = normalizeEventActionType(changes.actionType !== undefined ? changes.actionType : ev.actionType);
+    ev.actionType = actionType;
+    ev.targetSceneId = actionType === EVENT_ACTION_SCENE_LINK
+      ? normalizeEventTargetSceneId(changes.targetSceneId !== undefined ? changes.targetSceneId : ev.targetSceneId)
+      : null;
+    ev.actionLabel = actionType === EVENT_ACTION_SCENE_LINK
+      ? normalizeEventActionLabel(changes.actionLabel !== undefined ? changes.actionLabel : ev.actionLabel)
+      : '';
+  }
   pushUndo({ type: 'event-modify', id, before, after: serializeEvent(ev) });
   updateObjectPanel();
   scheduleRender('all');
   triggerImmediateSave();
 }
 
-function findTopEventAt(screenX, screenY, pointerType) {
+function findTopEventAt(screenX, screenY, pointerType, opts = {}) {
   const threshold = pointerType === 'touch' ? 10 : 4;
+  const ignoreVisibility = !!opts.ignoreVisibility;
   // 先扫 layer 0（永远可见，跳过 fog 检查），再扫 layer 1
   const tryLayer = (layerFilter, skipVisibilityCheck) => {
     const candidates = [];
@@ -6706,7 +7182,7 @@ function findTopEventAt(screenX, screenY, pointerType) {
       .filter((e) => (e.layer === 0 ? 0 : 1) === layerFilter)
       .sort((a, b) => b.zOrder - a.zOrder);
     for (const ev of sorted) {
-      if (!skipVisibilityCheck && !isEventVisible(ev)) continue;
+      if (!ignoreVisibility && !skipVisibilityCheck && !isEventVisible(ev)) continue;
       const [scx, scy] = mapToScreen(ev.x, ev.y);
       const d = dist(screenX, screenY, scx, scy);
       if (d <= ev.size / 2 + threshold) candidates.push({ ev, d });
@@ -6741,6 +7217,7 @@ function serializeEvent(ev) {
     title: ev.title, content: ev.content, size: ev.size, zOrder: ev.zOrder,
     layer: (ev.layer === 0 ? 0 : 1),
     entryIds: objectEntryIds(ev),
+    ...serializeEventAction(ev),
   };
 }
 
@@ -6764,6 +7241,7 @@ async function deserializeEvent(s) {
     zOrder: s.zOrder || nextEventZOrder(),
     layer: (s.layer === 0 ? 0 : 1),  // 旧存档无 layer 字段，默认 1
     entryIds: cleanEntryIds(s.entryIds || []),
+    ...serializeEventAction(s),
   };
 }
 
@@ -6781,9 +7259,15 @@ function showEventCard(eventId) {
       <span class="event-card-title">${escapeHtml(ev.title || '（未命名）')}</span>
     </div>
     <div class="event-card-content">${escapeHtml(ev.content || '（无描述）')}</div>
+    ${isSceneLinkEvent(ev) ? `
+      <div class="event-card-link">
+        <button id="evcard-scene-link" class="primary" ${ev.targetSceneId && state.scenes[ev.targetSceneId] ? '' : 'disabled'}>${escapeHtml(sceneLinkButtonLabel(ev))}</button>
+        <div class="event-card-link-meta">${escapeHtml(sceneLinkTargetName(ev))}</div>
+      </div>
+    ` : ''}
     <div class="event-card-actions">
-      <button id="evcard-edit">编辑</button>
-      <button id="evcard-del" class="danger" style="background: var(--theme-danger); border-color: var(--theme-danger); color: #fff;">删除</button>
+      ${isEditSurface() ? '<button id="evcard-edit">编辑</button>' : ''}
+      ${isEditSurface() ? '<button id="evcard-del" class="danger" style="background: var(--theme-danger); border-color: var(--theme-danger); color: #fff;">删除</button>' : ''}
     </div>
   `;
   card.classList.add('visible');
@@ -6791,16 +7275,29 @@ function showEventCard(eventId) {
     const img = card.querySelector('.event-card-icon img');
     if (img) img.src = URL.createObjectURL(ev.icon.blob);
   }
+  const linkBtn = $('evcard-scene-link');
+  if (linkBtn) {
+    linkBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!ev.targetSceneId || !state.scenes[ev.targetSceneId]) {
+        showToast('目标场景不存在');
+        return;
+      }
+      hideEventCard();
+      clearSelection({ render: false });
+      await switchScene(ev.targetSceneId);
+    });
+  }
   positionEventCard();
-  $('evcard-edit').addEventListener('click', (e) => {
+  const editBtn = $('evcard-edit');
+  if (editBtn) editBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!requireEditSurface()) return;
     hideEventCard();
     openEventEditDialog(null, eventId);
   });
-  $('evcard-del').addEventListener('click', (e) => {
+  const delBtn = $('evcard-del');
+  if (delBtn) delBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!requireEditSurface()) return;
     showConfirm('删除事件', `确定删除"${ev.title || '（未命名）'}"？可用 Ctrl+Z 撤销。`, () => {
       deleteEvent(eventId);
     }, { danger: true, yesText: '删除' });
@@ -6898,15 +7395,17 @@ function positionTokenActionBar() {
 //   if state.uiMode === 'modal'                              → return（弹窗优先）
 //   if state.gridCalibration                                 → 走校准拖动（不刷雾）
 //   if state.revealZoneDraft                                 → 走选格（不刷雾、不选对象）
-//   else 命中事件/Token/标注 + isEditSurface()                → role: 'token-drag' / 'annotation-drag' / 'event-interact'
-//   else 命中事件/Token/标注 + !isEditSurface()               → role: 'token-select' / 'annotation-select' / 'event-interact'
+//   else 命中 Token                                          → role: 'token-drag'（编辑态/跑团态都可拖）
+//   else 命中事件/标注 + isEditSurface()                      → role: 'annotation-drag' / 'event-interact'
+//   else 命中事件/标注 + !isEditSurface()                     → role: 'annotation-select' / 'event-interact'
+//   else 空白点击 + 编辑态 + 有网格                           → role: 'grid-mask-select'
 //   else 空白点击                                            → role: 'fog-stroke'（编辑态）或 clearSelection（跑团态）
 //
 // role 清单（onPointerMove / onPointerUp 按 role 分派）：
 //   fog-stroke           刷雾（揭/盖/全揭）。受 surfaceMode / activeLayer 影响
+//   grid-mask-select     编辑态按网格框选格子，松开后批量揭/盖
 //   event-interact       事件单击查看 / 编辑态拖动
-//   token-drag           编辑态拖动 Token
-//   token-select         跑团态选中 Token（不拖）
+//   token-drag           拖动 Token。跑团态也允许移动玩家/NPC Token
 //   annotation-drag      编辑态拖动标注
 //   annotation-select    跑团态选中标注（不拖）
 //
@@ -6990,12 +7489,13 @@ function onPointerDown(e) {
     if (insideMap(mx, my)) {
       info.role = 'create-event';
       info.createMx = mx; info.createMy = my;
+      info.createEventPreset = state.placeEventPreset || null;
     }
     return;
   }
 
   // hit-test 优先级：events → tokens → annotations → fog
-  const hitEvent = findTopEventAt(sx, sy, e.pointerType);
+  const hitEvent = findTopEventAt(sx, sy, e.pointerType, { ignoreVisibility: isEditSurface() });
   if (hitEvent) {
     info.role = 'event-interact';
     info.eventId = hitEvent.id;
@@ -7010,7 +7510,7 @@ function onPointerDown(e) {
   const hitToken = findTopTokenAt(mx, my);
   if (hitToken) {
     setSelectedObject('token', hitToken.id, { render: false });
-    info.role = isEditSurface() ? 'token-drag' : 'token-select';
+    info.role = 'token-drag';
     info.tokenId = hitToken.id;
     info.tokenStartX = hitToken.x;
     info.tokenStartY = hitToken.y;
@@ -7033,14 +7533,18 @@ function onPointerDown(e) {
     return;
   }
 
-  // 空白：触屏长按预备 + 笔刷 stroke
-  if (isEditSurface() && (e.pointerType === 'touch' || e.pointerType === 'pen')) {
-    startLongPressTimer(info, sx, sy);
-  }
-
   // 取消选中
   if (state.selectedTokenId || state.selectedEventId || state.selectedAnnotationId) {
     clearSelection({ render: false });
+  }
+
+  if (isEditSurface() && state.grid && state.grid.enabled && beginGridMaskSelection(info, sx, sy)) {
+    return;
+  }
+
+  // 空白：触屏长按预备 + 笔刷 stroke
+  if (isEditSurface() && (e.pointerType === 'touch' || e.pointerType === 'pen')) {
+    startLongPressTimer(info, sx, sy);
   }
 
   info.role = state.brush.mode;
@@ -7050,7 +7554,7 @@ function onPointerDown(e) {
 
 function safeSelectAt(sx, sy, pointerType = 'mouse') {
   if (!state.hasMap) return;
-  const hitEvent = findTopEventAt(sx, sy, pointerType);
+  const hitEvent = findTopEventAt(sx, sy, pointerType, { ignoreVisibility: isEditSurface() });
   if (hitEvent) {
     setSelectedObject('event', hitEvent.id, { render: false, keepEventCard: true });
     showEventCard(hitEvent.id);
@@ -7118,7 +7622,7 @@ function onPointerMove(e) {
   state.cursorScreenX = x;
   state.cursorScreenY = y;
   if (e.pointerType === 'mouse') {
-    state.showBrushPreview = state.hasMap && !state.spaceHeld && (state.brush.mode === 'reveal' || state.brush.mode === 'cover' || state.brush.mode === 'reveal-all');
+    state.showBrushPreview = state.hasMap && !state.gridMaskSelection && !state.spaceHeld && (state.brush.mode === 'reveal' || state.brush.mode === 'cover' || state.brush.mode === 'reveal-all');
     scheduleRender('all');
   }
   // 长按位移取消
@@ -7134,6 +7638,8 @@ function onPointerMove(e) {
     moveGridCalibration(info, x, y);
   } else if (info.role === 'reveal-zone-select') {
     applyRevealZonePointerCell(x, y, info.removeFromZone);
+  } else if (info.role === 'grid-mask-select') {
+    updateGridMaskSelection(x, y);
   } else if (state.pointers.size >= 2 && info.role === 'pinch') {
     onPinchMove();
     info.lastX = x; info.lastY = y;
@@ -7214,6 +7720,8 @@ function onPointerUp(e) {
     if (state.gridCalibration) state.gridCalibration.pointerId = null;
   } else if (info.role === 'reveal-zone-select') {
     if (state.revealZoneDraft) state.revealZoneDraft.lastCell = null;
+  } else if (info.role === 'grid-mask-select') {
+    finishGridMaskSelection(info);
   } else if (info.role === 'reveal' || info.role === 'cover' || info.role === 'reveal-all') {
     onStrokeEnd(false);
   } else if (info.role === 'token-drag') {
@@ -7236,8 +7744,8 @@ function onPointerUp(e) {
     triggerImmediateSave();
   } else if (info.role === 'pan' && info.safeSelect && !info.panStarted) {
     safeSelectAt(info.lastX, info.lastY, info.type);
-  } else if (info.role === 'token-select' || info.role === 'annotation-select') {
-    // 跑团态只选中查看，不移动或保存对象。
+  } else if (info.role === 'annotation-select') {
+    // 跑团态标注只选中查看，不移动或保存对象。
   } else if (info.role === 'event-interact') {
     // 单击：根据是否双击决定
     const now = performance.now();
@@ -7254,7 +7762,7 @@ function onPointerUp(e) {
     }
     scheduleRender('all');
   } else if (info.role === 'create-event') {
-    openEventEditDialog(null, null, info.createMx, info.createMy);
+    openEventEditDialog(null, null, info.createMx, info.createMy, info.createEventPreset || null);
     if (state.placeEventMode) togglePlaceEventMode(false);
   }
   state.pointers.delete(e.pointerId);
@@ -7270,6 +7778,8 @@ function onPointerCancel(e) {
     if (state.gridCalibration) state.gridCalibration.pointerId = null;
   } else if (info.role === 'reveal-zone-select') {
     if (state.revealZoneDraft) state.revealZoneDraft.lastCell = null;
+  } else if (info.role === 'grid-mask-select') {
+    cancelGridMaskSelection();
   } else if (info.role === 'reveal' || info.role === 'cover' || info.role === 'reveal-all') {
     if (state.activeStroke && state.activeStroke.affectedTiles.size >= 1) onStrokeEnd(true);
     else state.activeStroke = null;
@@ -7386,13 +7896,15 @@ function handleEntryHotkeyDown(e) {
   const entry = getEntryByHotkey(key);
   if (!entry) return false;
   if (!isEditSurface() && entry.livePicker === false) return false;
-  if (normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones') {
+  const purpose = normalizeEntryPurpose(entry.purpose);
+  const action = normalizeEntryHotkeyAction(entry.hotkeyAction);
+  if (entryCanRevealZone(entry) && (purpose === 'reveal-zone' || action === 'reveal-zones')) {
     revealZonesForEntryId(entry.id);
     e.preventDefault();
     return true;
   }
-  setActiveEntry(state.activeEntryId === entry.id ? null : entry.id);
-  showToast(state.activeEntryId ? `词条聚光：${entryDisplayName(entry)}` : `已关闭词条：${entry.name}`, 1200);
+  if (!entryCanSpotlight(entry)) return false;
+  toggleEventsForEntryId(entry.id);
   e.preventDefault();
   return true;
 }
@@ -7414,6 +7926,11 @@ function onKeyDown(e) {
   }
   if (state.revealZoneDraft && e.key === 'Escape') {
     cancelRevealZoneDraft();
+    e.preventDefault();
+    return;
+  }
+  if (state.gridMaskSelection && e.key === 'Escape') {
+    cancelGridMaskSelection();
     e.preventDefault();
     return;
   }
@@ -7526,6 +8043,7 @@ function onKeyUp(e) {
 function setLayer(layer) {
   // 切层前若有进行中 stroke，先 commit
   if (state.activeStroke) onStrokeEnd(false);
+  if (state.gridMaskSelection) cancelGridMaskSelection();
   state.currentLayer = layer;
   $('btn-layer-terrain').classList.toggle('active', layer === 'terrain');
   $('btn-layer-event').classList.toggle('active', layer === 'event');
@@ -7536,6 +8054,7 @@ function setLayer(layer) {
 
 function setBrushMode(mode) {
   if (state.activeStroke) onStrokeEnd(false);
+  if (state.gridMaskSelection) cancelGridMaskSelection();
   if (!['reveal', 'cover', 'reveal-all'].includes(mode)) mode = 'reveal';
   state.brush.mode = mode;
   $('btn-mode-reveal').classList.toggle('active', mode === 'reveal');
@@ -7567,24 +8086,31 @@ function setBrushSize(v) {
   triggerDebouncedSave();
 }
 
-function togglePlaceEventMode(force) {
+function togglePlaceEventMode(force, preset = null) {
   if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
   const next = (force === undefined) ? !state.placeEventMode : force;
   if (next && !isEditSurface()) { showToast('放置事件请先进入编辑态'); return; }
+  if (next && state.gridMaskSelection) cancelGridMaskSelection();
   const prev = state.placeEventMode;
+  const nextPreset = next ? (preset || null) : null;
   state.placeEventMode = next;
-  $('btn-place-event').classList.toggle('active', next);
+  state.placeEventPreset = nextPreset;
+  $('btn-place-event').classList.toggle('active', next && nextPreset !== EVENT_ACTION_SCENE_LINK);
+  $('btn-place-scene-link').classList.toggle('active', next && nextPreset === EVENT_ACTION_SCENE_LINK);
   state.mainCanvas.style.cursor = next ? 'crosshair' : '';
   if (state.activeStroke) onStrokeEnd(false);
   // 状态栏提示
-  $('status-place-event').textContent = next ? '🎯 放置事件中 · 点击地图添加 · Esc 退出' : '';
+  $('status-place-event').textContent = next
+    ? (nextPreset === EVENT_ACTION_SCENE_LINK ? '↪ 放置场景转移点 · 点击地图添加 · Esc 退出' : '🎯 放置事件中 · 点击地图添加 · Esc 退出')
+    : '';
   $('app').classList.toggle('placing-event', next);
   // 进入时弹一次 toast 强调
-  if (next && !prev) showToast('放置事件模式：点击地图添加，Esc 退出', 3000);
+  if (next && !prev) showToast(nextPreset === EVENT_ACTION_SCENE_LINK ? '放置场景转移点：点击地图添加，Esc 退出' : '放置事件模式：点击地图添加，Esc 退出', 3000);
 }
 
 // ============== Modal ==============
 function showModal(html, opts) {
+  if (state.gridMaskSelection) cancelGridMaskSelection();
   const root = $('modal-root');
   const extraClass = opts?.className ? ` ${escapeHtml(opts.className)}` : '';
   root.innerHTML = `<div class="modal-card${extraClass}">` + html + '</div>';
@@ -8035,7 +8561,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.26.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.31.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -8825,6 +9351,9 @@ async function cloudSync_applyStateBundle(bundleJson, mapBlobsBySceneId) {
   }
   const preferred = preparedEntries.find((entry) => entry.newId === bundleJson.currentSceneId) || preparedEntries[0];
   const preferredPreparedRestore = await prepareSavedRestore(preferred.scene, preferred.scene.mapSize);
+  const sceneIdMap = new Map();
+  preparedEntries.forEach((entry) => sceneIdMap.set(entry.scene.importedFromSceneId || entry.newId, entry.newId));
+  preparedEntries.forEach((entry) => remapEventSceneLinksInScene(entry.scene, sceneIdMap));
   const nextScenes = {};
   for (const entry of preparedEntries) nextScenes[entry.newId] = entry.scene;
   state.scenes = nextScenes;
@@ -10158,7 +10687,7 @@ function openTokenUploadDialog(file, existingId) {
       <input id="token-explore-radius" type="range" min="${TOKEN_EXPLORE_RADIUS_MIN}" max="${TOKEN_EXPLORE_RADIUS_MAX}" step="5" value="${Math.round(initExploreRadius)}">
       <div class="form-note">清雾半径：<span id="token-explore-radius-value">${Math.round(initExploreRadius)}</span> px。拖动时清除地形层和事件层遮罩。</div>
     </div>
-    ${entryAssignmentHTML(initEntryIds)}
+    ${entryAssignmentHTML(initEntryIds, { defaultPurpose: 'spotlight' })}
     <div class="modal-actions">
       <button id="token-cancel">取消</button>
       <button id="token-confirm" class="primary">${editing ? '保存' : '添加'}</button>
@@ -10185,7 +10714,7 @@ function openTokenUploadDialog(file, existingId) {
         });
       });
       if (selShape === 'circle') preview.style.borderRadius = '50%';
-      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds, { defaultPurpose: 'spotlight' });
 
       let selColor = initColor;
       let selPattern = editing ? editing.borderPattern : 'solid';
@@ -10252,7 +10781,7 @@ function openTokenUploadDialog(file, existingId) {
 function openEditTokenModal(tokenId) { openTokenUploadDialog(null, tokenId); }
 
 // ============== 加载 / 编辑事件弹窗 ==============
-function openEventEditDialog(file, eventId, mapX, mapY) {
+function openEventEditDialog(file, eventId, mapX, mapY, preset = null) {
   // file: 上传的 image 文件（可选，点上传图片后传）
   // eventId: 编辑现有事件
   // mapX/mapY: 创建事件的位置（仅创建时用）
@@ -10262,6 +10791,10 @@ function openEventEditDialog(file, eventId, mapX, mapY) {
   const initTitle = editing ? editing.title : '';
   const initContent = editing ? editing.content : '';
   const initEntryIds = editing ? editing.entryIds : [];
+  const initActionType = editing ? normalizeEventActionType(editing.actionType) : normalizeEventActionType(preset);
+  const initTargetSceneId = editing ? (editing.targetSceneId || '') : '';
+  const initActionLabel = editing ? normalizeEventActionLabel(editing.actionLabel) : '';
+  const sceneOptions = eventActionSceneOptionsHTML(initTargetSceneId);
   showModal(`
     <div class="modal-title">${editing ? '编辑事件' : '添加事件'}</div>
     <div id="event-icon-preview"></div>
@@ -10301,7 +10834,24 @@ function openEventEditDialog(file, eventId, mapX, mapY) {
         <button class="option-btn" data-layer="0">永远可见（剧情关键信息）</button>
       </div>
     </div>
-    ${entryAssignmentHTML(initEntryIds)}
+    <div class="form-row">
+      <label>事件动作</label>
+      <select id="event-action-type">
+        <option value="${EVENT_ACTION_NONE}"${initActionType === EVENT_ACTION_NONE ? ' selected' : ''}>普通事件</option>
+        <option value="${EVENT_ACTION_SCENE_LINK}"${initActionType === EVENT_ACTION_SCENE_LINK ? ' selected' : ''}>场景转移</option>
+      </select>
+      <div id="event-scene-link-options" style="margin-top:8px;display:none;">
+        <label style="margin-top:0;">目标场景</label>
+        <select id="event-target-scene">
+          <option value="">选择目标场景</option>
+          ${sceneOptions}
+        </select>
+        <label style="margin-top:8px;">按钮文案</label>
+        <input id="event-action-label" type="text" maxlength="40" placeholder="留空则显示 前往：目标场景">
+        <div class="form-note">场景转移事件仍在地图上显示、受遮罩和词条影响，但不会出现在右侧对象面板的事件列表里。</div>
+      </div>
+    </div>
+    ${entryAssignmentHTML(initEntryIds, { defaultPurpose: 'spotlight' })}
     <div class="modal-actions">
       ${editing ? '<button id="event-delete-in-edit" class="danger">删除</button>' : ''}
       <button id="event-cancel">取消</button>
@@ -10310,7 +10860,7 @@ function openEventEditDialog(file, eventId, mapX, mapY) {
   `, {
     onMounted: () => {
       let curIcon = initIcon;
-      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds, { defaultPurpose: 'spotlight' });
       let imageBlobUrl = null;
       let pendingImageBlob = (initIcon.type === 'image' ? initIcon.blob : null);
 
@@ -10421,6 +10971,17 @@ function openEventEditDialog(file, eventId, mapX, mapY) {
       // 标题/内容
       $('event-title').value = initTitle;
       $('event-content').value = initContent;
+      $('event-action-label').value = initActionLabel;
+
+      const actionTypeInput = $('event-action-type');
+      const targetSceneInput = $('event-target-scene');
+      const sceneLinkOptions = $('event-scene-link-options');
+      const syncActionOptions = () => {
+        const isLink = actionTypeInput.value === EVENT_ACTION_SCENE_LINK;
+        sceneLinkOptions.style.display = isLink ? '' : 'none';
+      };
+      actionTypeInput.addEventListener('change', syncActionOptions);
+      syncActionOptions();
 
       // layer 选择
       let selLayer = editing ? (editing.layer === 0 ? 0 : 1) : 1;
@@ -10458,15 +11019,22 @@ function openEventEditDialog(file, eventId, mapX, mapY) {
         const title = $('event-title').value.trim();
         const content = $('event-content').value;
         const entryIds = getEntryIds();
+        const actionType = normalizeEventActionType(actionTypeInput.value);
+        const targetSceneId = actionType === EVENT_ACTION_SCENE_LINK ? normalizeEventTargetSceneId(targetSceneInput.value) : null;
+        const actionLabel = actionType === EVENT_ACTION_SCENE_LINK ? normalizeEventActionLabel($('event-action-label').value) : '';
+        if (actionType === EVENT_ACTION_SCENE_LINK && !targetSceneId) {
+          showToast('请选择目标场景');
+          return;
+        }
         cleanup(); closeModal();
         if (editing) {
-          await modifyEvent(eventId, { icon: curIcon, title, content, layer: selLayer, entryIds });
+          await modifyEvent(eventId, { icon: curIcon, title, content, layer: selLayer, entryIds, actionType, targetSceneId, actionLabel });
           scheduleRender('all');
         } else {
           createEvent({
             x: mapX != null ? mapX : state.mapCanvas.width / 2,
             y: mapY != null ? mapY : state.mapCanvas.height / 2,
-            icon: curIcon, title, content, layer: selLayer, entryIds,
+            icon: curIcon, title, content, layer: selLayer, entryIds, actionType, targetSceneId, actionLabel,
           });
         }
       });
@@ -10514,7 +11082,7 @@ function openTextAnnotationDialog(annotationId, mapX, mapY) {
       <label>遮罩规则</label>
       ${annotationMaskSelectHTML(initMask)}
     </div>
-    ${entryAssignmentHTML(initEntryIds)}
+    ${entryAssignmentHTML(initEntryIds, { defaultPurpose: 'spotlight' })}
     <div class="modal-actions">
       ${editing ? '<button id="annotation-delete-in-edit" class="danger">删除</button>' : ''}
       <button id="annotation-cancel">取消</button>
@@ -10522,7 +11090,7 @@ function openTextAnnotationDialog(annotationId, mapX, mapY) {
     </div>
   `, {
     onMounted: () => {
-      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds, { defaultPurpose: 'spotlight' });
       $('annotation-cancel').addEventListener('click', closeModal);
       const delBtn = $('annotation-delete-in-edit');
       if (delBtn) {
@@ -10575,7 +11143,7 @@ function openImageAnnotationDialog(file, annotationId, mapX, mapY) {
       <label>遮罩规则</label>
       ${annotationMaskSelectHTML(initMask)}
     </div>
-    ${entryAssignmentHTML(initEntryIds)}
+    ${entryAssignmentHTML(initEntryIds, { defaultPurpose: 'spotlight' })}
     <div class="modal-actions">
       ${editing ? '<button id="annotation-delete-in-edit" class="danger">删除</button>' : ''}
       <button id="annotation-cancel">取消</button>
@@ -10583,7 +11151,7 @@ function openImageAnnotationDialog(file, annotationId, mapX, mapY) {
     </div>
   `, {
     onMounted: () => {
-      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds, { defaultPurpose: 'spotlight' });
       $('annotation-cancel').addEventListener('click', closeModal);
       const delBtn = $('annotation-delete-in-edit');
       if (delBtn) {
@@ -10621,6 +11189,7 @@ function openAnnotationEditDialog(annotationId) {
 }
 
 function eventQuickMatches(ev, query) {
+  if (isSceneLinkEvent(ev)) return false;
   if (!query) return true;
   return [
     ev.title || '',
@@ -10710,64 +11279,60 @@ function openEventQuickToggleModal() {
   });
 }
 
-// ============== 词条聚光 ==============
+// ============== 词条动作 ==============
 function openEntrySpotlightModal() {
   if (!state.hasMap) { showToast('请先加载地图'); return; }
   pruneEntryReferences();
   const counts = collectEntryCounts();
   const canManage = isEditSurface();
   const entries = (state.entries || []).filter((entry) => {
+    if (!entryCanSpotlight(entry) && !entryCanRevealZone(entry)) return false;
     if (canManage) return true;
     const row = counts.get(entry.id);
     return entry.livePicker !== false && row && row.total > 0;
   });
   const rows = entries.map((entry) => {
     const row = counts.get(entry.id) || { event: 0, token: 0, annotation: 0, total: 0 };
-    const active = state.activeEntryId === entry.id;
     const zoneText = row.zone ? ` · ${row.zone} 区` : '';
+    const eventText = row.event ? ` · ${row.event} 事件` : '';
+    const actionText = entryCanRevealZone(entry) && !entryCanSpotlight(entry)
+      ? `切换区域${zoneText}`
+      : `切换事件${eventText}`;
     return `
-      <button class="info-tag-row${active ? ' active' : ''}" data-entry-id="${escapeHtml(entry.id)}">
+      <button class="info-tag-row" data-entry-id="${escapeHtml(entry.id)}">
         <span style="display:flex;align-items:center;gap:8px;min-width:0;">
           <span class="entry-color-dot" style="background:${escapeHtml(entry.color)}"></span>
           ${entry.hotkey ? `<span class="entry-hotkey-badge">${escapeHtml(entry.hotkey)}</span>` : ''}
           <span class="info-tag-name">${escapeHtml(entry.name)}</span>
+          ${normalizeEntryPurpose(entry.purpose) !== 'spotlight' ? `<span class="entry-hotkey-action-badge">${escapeHtml(entryPurposeLabel(entry.purpose))}</span>` : ''}
           ${entry.hotkey && normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones' ? '<span class="entry-hotkey-action-badge">切换</span>' : ''}
         </span>
-        <span class="info-tag-count">${canManage ? `${row.total} 项${zoneText}` : (active ? `已显露${zoneText}` : `选择${zoneText}`)}</span>
+        <span class="info-tag-count">${canManage ? `${row.total} 项${zoneText}${eventText}` : actionText}</span>
       </button>
     `;
   }).join('');
-  const title = state.activeEntryId ? `词条聚光：${escapeHtml(getEntryById(state.activeEntryId)?.name || '已选择')}` : '词条聚光';
-  const activeZoneCount = revealZonesForEntry(state.activeEntryId).length;
   showModal(`
-    <div class="modal-title">${title}</div>
-    <div class="modal-desc">${canManage ? '选择一个词条可临时显露并高亮它关联的对象和揭示区域；管理入口只在编辑态开放。' : '选择一个现场词条，只临时显露和高亮；若该词条绑定了区域，可手动一键揭示。'}</div>
+    <div class="modal-title">词条动作</div>
+    <div class="modal-desc">${canManage ? '选择词条可切换绑定事件的显示层级，或切换绑定揭示区域；管理入口只在编辑态开放。' : '选择一个现场词条，切换绑定事件到遮罩上层，或切换绑定区域显示。'}</div>
     <div class="info-tag-list">${rows || '<div class="object-empty">当前场景还没有可用词条。</div>'}</div>
     <div class="modal-actions">
       ${canManage ? '<button id="entry-manage">管理词条</button>' : ''}
-      ${activeZoneCount ? `<button id="entry-reveal-zones">揭示当前词条区域（${activeZoneCount}）</button>` : ''}
-      <button id="entry-clear">清除聚光</button>
       <button id="entry-close" class="primary">关闭</button>
     </div>
   `, {
     onMounted: () => {
       document.querySelectorAll('.info-tag-row[data-entry-id]').forEach((btn) => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           const id = btn.dataset.entryId;
-          setActiveEntry(state.activeEntryId === id ? null : id);
+          const entry = getEntryById(id);
           closeModal();
+          if (entryCanRevealZone(entry) && !entryCanSpotlight(entry)) revealZonesForEntryId(id);
+          else await toggleEventsForEntryId(id);
           openEntrySpotlightModal();
         });
       });
       const manage = $('entry-manage');
       if (manage) manage.addEventListener('click', () => { closeModal(); openEntryManagerModal(); });
-      const revealBtn = $('entry-reveal-zones');
-      if (revealBtn) revealBtn.addEventListener('click', () => {
-        const id = state.activeEntryId;
-        closeModal();
-        revealZonesForEntryIdOnly(id);
-      });
-      $('entry-clear').addEventListener('click', () => { setActiveEntry(null); closeModal(); showToast('词条聚光已关闭'); });
       $('entry-close').addEventListener('click', closeModal);
     }
   });
@@ -10792,14 +11357,14 @@ function openRevealZoneEditor(zoneId = null) {
       <option value="event"${initLayer === 'event' ? ' selected' : ''}>事件层</option>
       <option value="all"${initLayer === 'all' ? ' selected' : ''}>双层</option>
     </select>
-    ${entryAssignmentHTML(initEntryIds)}
+    ${entryAssignmentHTML(initEntryIds, { defaultPurpose: 'reveal-zone' })}
     <div class="modal-actions">
       <button id="reveal-zone-editor-cancel">取消</button>
       <button id="reveal-zone-editor-start" class="primary">开始选格</button>
     </div>
   `, {
     onMounted: () => {
-      const getEntryIds = mountEntryAssignmentControl(initEntryIds);
+      const getEntryIds = mountEntryAssignmentControl(initEntryIds, { defaultPurpose: 'reveal-zone' });
       $('reveal-zone-editor-cancel').onclick = closeModal;
       $('reveal-zone-editor-start').onclick = () => {
         const name = $('reveal-zone-name').value.trim() || '揭示区域';
@@ -10882,8 +11447,9 @@ function openEntryManagerModal() {
         <span class="entry-color-dot" style="background:${escapeHtml(entry.color)}"></span>
         <input class="entry-manager-name" type="text" maxlength="40" value="${escapeHtml(entry.name)}">
         <input class="entry-manager-hotkey entry-hotkey-input" type="text" maxlength="1" value="${escapeHtml(entry.hotkey || '')}" placeholder="键">
+        <select class="entry-manager-purpose entry-purpose-select">${entryPurposeOptionsHTML(entry.purpose)}</select>
         <select class="entry-manager-hotkey-action entry-hotkey-action">
-          <option value="spotlight"${normalizeEntryHotkeyAction(entry.hotkeyAction) === 'spotlight' ? ' selected' : ''}>聚光</option>
+          <option value="spotlight"${normalizeEntryHotkeyAction(entry.hotkeyAction) === 'spotlight' ? ' selected' : ''}>切换事件上层</option>
           <option value="reveal-zones"${normalizeEntryHotkeyAction(entry.hotkeyAction) === 'reveal-zones' ? ' selected' : ''}>切换区域显示</option>
         </select>
         <input class="entry-manager-color" type="text" maxlength="7" value="${escapeHtml(entry.color)}">
@@ -10901,8 +11467,9 @@ function openEntryManagerModal() {
       <div class="entry-manager-new-row">
         <input id="entry-manager-new-name" type="text" maxlength="40" placeholder="词条名">
         <input id="entry-manager-new-hotkey" class="entry-hotkey-input" type="text" maxlength="1" placeholder="键">
+        <select id="entry-manager-new-purpose" class="entry-purpose-select">${entryPurposeOptionsHTML('spotlight')}</select>
         <select id="entry-manager-new-hotkey-action" class="entry-hotkey-action">
-          <option value="spotlight">聚光</option>
+          <option value="spotlight">切换事件上层</option>
           <option value="reveal-zones">切换区域显示</option>
         </select>
         <button id="entry-manager-new-add" type="button">新建</button>
@@ -10920,6 +11487,7 @@ function openEntryManagerModal() {
       const addNewEntry = () => {
         const entry = createEntry($('entry-manager-new-name').value, {
           hotkey: $('entry-manager-new-hotkey')?.value,
+          purpose: $('entry-manager-new-purpose')?.value,
           hotkeyAction: $('entry-manager-new-hotkey-action')?.value,
         });
         if (entry) { closeModal(); openEntryManagerModal(); }
@@ -10979,6 +11547,7 @@ function openEntryManagerModal() {
           drafts.push({
             entry,
             name,
+            purpose: normalizeEntryPurpose(row.querySelector('.entry-manager-purpose')?.value),
             hotkey,
             hotkeyAction: normalizeEntryHotkeyAction(row.querySelector('.entry-manager-hotkey-action')?.value),
             color: normalizeHex(row.querySelector('.entry-manager-color')?.value || entry.color),
@@ -10989,6 +11558,7 @@ function openEntryManagerModal() {
         if (!ok) { showToast(hotkeyError || '词条名不能为空，也不能重名'); return; }
         drafts.forEach((draft) => {
           draft.entry.name = draft.name;
+          draft.entry.purpose = draft.purpose;
           draft.entry.hotkey = draft.hotkey;
           draft.entry.hotkeyAction = draft.hotkeyAction;
           draft.entry.color = draft.color;
@@ -11440,7 +12010,7 @@ function setupEventListeners() {
     if (state.uiMode !== 'normal') return;
     const off = getCanvasOffset();
     const x = e.clientX - off.x, y = e.clientY - off.y;
-    const hitEvent = findTopEventAt(x, y, e.pointerType || 'mouse');
+    const hitEvent = findTopEventAt(x, y, e.pointerType || 'mouse', { ignoreVisibility: isEditSurface() });
     if (hitEvent && isEditSurface()) {
       hideEventCard();
       openEventEditDialog(null, hitEvent.id);
@@ -11554,7 +12124,16 @@ function setupEventListeners() {
     if (!requireEditSurface()) return;
     if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
     if (!state.hasMap) { showToast('请先加载地图'); return; }
-    togglePlaceEventMode();
+    togglePlaceEventMode(state.placeEventPreset === EVENT_ACTION_SCENE_LINK ? true : undefined, null);
+  });
+
+  $('btn-place-scene-link').addEventListener('click', () => {
+    if (!requireEditSurface()) return;
+    if (state.gridCalibration) { showToast('请先完成或取消网格校准'); return; }
+    if (!state.hasMap) { showToast('请先加载地图'); return; }
+    const sceneCount = Object.keys(state.scenes || {}).length;
+    if (sceneCount < 2) { showToast('请先准备至少两个场景'); return; }
+    togglePlaceEventMode(state.placeEventPreset === EVENT_ACTION_SCENE_LINK ? undefined : true, EVENT_ACTION_SCENE_LINK);
   });
 
   $('btn-layer-terrain').addEventListener('click', () => setLayer('terrain'));
@@ -11661,4 +12240,3 @@ window.__fogState = state;
 </script>
 </body>
 </html>
-
