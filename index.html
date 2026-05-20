@@ -1937,7 +1937,7 @@ button.active .nav-ico,
       <span class="seg" id="status-place-event" style="color: var(--theme-accent); font-weight: 600;"></span>
       <span class="seg" id="status-saved" data-save-state="dirty">未保存</span>
       <span class="seg error" id="status-error"></span>
-      <span class="seg status-version-stamp" id="status-version-stamp" title="Build stamp">v3.33.0 | 2026-05-20</span>
+      <span class="seg status-version-stamp" id="status-version-stamp" title="Build stamp">v3.34.0 | 2026-05-20</span>
     </span>
   </div>
   <div id="dropdown-menu"></div>
@@ -3813,6 +3813,7 @@ async function serializeActiveSceneData() {
     entryIds: objectEntryIds(t),
     explorerEnabled: !!t.explorerEnabled,
     exploreRadius: normalizeTokenExploreRadius(t.exploreRadius),
+    gridMoveEnabled: normalizeTokenGridMoveEnabled(t.gridMoveEnabled, !!t.explorerEnabled),
   }));
   const eventsSerialized = state.events.map((ev) => ({
     id: ev.id, x: ev.x, y: ev.y,
@@ -3976,6 +3977,7 @@ async function serializeSceneForBundle(sceneId, scene, opts = {}) {
     entryIds: normalizeEntryIdsForEntries(t.entryIds || [], sceneEntries),
     explorerEnabled: !!t.explorerEnabled,
     exploreRadius: normalizeTokenExploreRadius(t.exploreRadius),
+    gridMoveEnabled: normalizeTokenGridMoveEnabled(t.gridMoveEnabled, !!t.explorerEnabled),
   })));
   const eventsExported = await Promise.all((scene.events || []).map(async (ev) => {
     const icon = ev.icon || { type: 'emoji', value: '❓' };
@@ -4087,6 +4089,7 @@ async function bundleScenePayloadToSaved(scenePayload) {
     ...t,
     blob: await base64ToBlob(t.blob),
     entryIds: normalizeEntryIdsForEntries(t.entryIds || [], entries),
+    gridMoveEnabled: normalizeTokenGridMoveEnabled(t.gridMoveEnabled, !!t.explorerEnabled),
   })));
   const events = await Promise.all((scenePayload.events || []).map(async (ev) => {
     const icon = ev.icon || { type: 'emoji', value: '❓' };
@@ -4324,6 +4327,7 @@ async function doImportProject(payload) {
       ...t,
       blob: await base64ToBlob(t.blob),
       entryIds: normalizeEntryIdsForEntries(t.entryIds || [], entries),
+      gridMoveEnabled: normalizeTokenGridMoveEnabled(t.gridMoveEnabled, !!t.explorerEnabled),
     })));
     const eventsRestored = await Promise.all((payload.events || []).map(async (ev) => {
       const icon = ev.icon || { type: 'emoji', value: '❓' };
@@ -5589,6 +5593,106 @@ function normalizeTokenExploreRadius(value) {
   return clamp(n, TOKEN_EXPLORE_RADIUS_MIN, TOKEN_EXPLORE_RADIUS_MAX);
 }
 
+function normalizeTokenGridMoveEnabled(value, explorerEnabled = false) {
+  return value == null ? !!explorerEnabled : !!value;
+}
+
+function tokenGridMoveEnabled(token) {
+  return !!token && normalizeTokenGridMoveEnabled(token.gridMoveEnabled, !!token.explorerEnabled);
+}
+
+function activeGridForTokenMove() {
+  if (!state.hasMap || !state.grid || !state.grid.enabled) return null;
+  return normalizeGridSettings(state.grid);
+}
+
+function gridMoveNeighborCells(cell) {
+  if (!cell) return [];
+  if (cell.type === 'square') {
+    return [
+      { type: 'square', col: cell.col + 1, row: cell.row },
+      { type: 'square', col: cell.col - 1, row: cell.row },
+      { type: 'square', col: cell.col, row: cell.row + 1 },
+      { type: 'square', col: cell.col, row: cell.row - 1 },
+    ];
+  }
+  return [
+    { type: 'hex', q: cell.q + 1, r: cell.r },
+    { type: 'hex', q: cell.q + 1, r: cell.r - 1 },
+    { type: 'hex', q: cell.q, r: cell.r - 1 },
+    { type: 'hex', q: cell.q - 1, r: cell.r },
+    { type: 'hex', q: cell.q - 1, r: cell.r + 1 },
+    { type: 'hex', q: cell.q, r: cell.r + 1 },
+  ];
+}
+
+function gridMoveDirectionFromKey(e) {
+  if (!e || e.ctrlKey || e.metaKey || e.altKey) return null;
+  const code = e.code || '';
+  if (e.key === 'ArrowUp' || code === 'Numpad8') return { x: 0, y: -1 };
+  if (e.key === 'ArrowDown' || code === 'Numpad2') return { x: 0, y: 1 };
+  if (e.key === 'ArrowLeft' || code === 'Numpad4') return { x: -1, y: 0 };
+  if (e.key === 'ArrowRight' || code === 'Numpad6') return { x: 1, y: 0 };
+  return null;
+}
+
+function chooseGridMoveNeighbor(cell, grid, direction) {
+  const [cx, cy] = gridCellCenter(cell, grid);
+  let best = null;
+  let bestScore = -Infinity;
+  for (const candidate of gridMoveNeighborCells(cell)) {
+    const [nx, ny] = gridCellCenter(candidate, grid);
+    const dx = nx - cx;
+    const dy = ny - cy;
+    const len = Math.max(0.0001, Math.hypot(dx, dy));
+    const score = (dx / len) * direction.x + (dy / len) * direction.y;
+    if (score > bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+function snapTokenToGridCell(token, grid, cell) {
+  if (!token || !grid || !cell) return false;
+  const [cx, cy] = gridCellCenter(cell, grid);
+  const prevX = token.x;
+  const prevY = token.y;
+  token.x = cx;
+  token.y = cy;
+  clampTokenToMap(token);
+  return Math.abs(token.x - prevX) > 0.01 || Math.abs(token.y - prevY) > 0.01;
+}
+
+function snapTokenToCurrentGridCell(token, grid = activeGridForTokenMove()) {
+  if (!token || !grid) return false;
+  const cell = gridCellAtPoint(token.x, token.y, grid);
+  return snapTokenToGridCell(token, grid, cell);
+}
+
+function moveSelectedTokenByGridKey(e) {
+  const direction = gridMoveDirectionFromKey(e);
+  if (!direction || !state.selectedTokenId) return false;
+  const token = state.tokens.find((t) => t.id === state.selectedTokenId);
+  const grid = activeGridForTokenMove();
+  if (!token || !grid || !tokenGridMoveEnabled(token)) return false;
+
+  const currentCell = gridCellAtPoint(token.x, token.y, grid);
+  const [cx, cy] = gridCellCenter(currentCell, grid);
+  const offCenter = dist(token.x, token.y, cx, cy) > 0.75;
+  const targetCell = offCenter ? currentCell : chooseGridMoveNeighbor(currentCell, grid, direction);
+  if (!targetCell) return false;
+
+  const moved = snapTokenToGridCell(token, grid, targetCell);
+  if (!moved) return true;
+  if (token.explorerEnabled) paintTokenExploreFog(token);
+  scheduleRender('all');
+  positionTokenActionBar();
+  triggerImmediateSave();
+  return true;
+}
+
 function createTokenExploreStroke() {
   return {
     layer: 'all',
@@ -6696,6 +6800,7 @@ async function createTokenFromFile(file, opts) {
     entryIds: normalizeEntryIds(opts.entryIds || []),
     explorerEnabled: !!opts.explorerEnabled,
     exploreRadius: normalizeTokenExploreRadius(opts.exploreRadius),
+    gridMoveEnabled: normalizeTokenGridMoveEnabled(opts.gridMoveEnabled, !!opts.explorerEnabled),
   };
   state.tokens.push(token);
   setSelectedObject('token', token.id, { render: false });
@@ -6715,6 +6820,7 @@ async function rebuildTokenFromSerialized(s) {
     entryIds: cleanEntryIds(s.entryIds || []),
     explorerEnabled: !!s.explorerEnabled,
     exploreRadius: normalizeTokenExploreRadius(s.exploreRadius),
+    gridMoveEnabled: normalizeTokenGridMoveEnabled(s.gridMoveEnabled, !!s.explorerEnabled),
   };
 }
 
@@ -7929,6 +8035,11 @@ function onPointerUp(e) {
   } else if (info.role === 'token-drag') {
     const t = state.tokens.find((tt) => tt.id === info.tokenId);
     const moved = t && dist(info.startX, info.startY, info.lastX, info.lastY) > EVENT_DRAG_THRESHOLD;
+    if (moved && t && tokenGridMoveEnabled(t) && activeGridForTokenMove()) {
+      snapTokenToCurrentGridCell(t);
+      scheduleRender('all');
+      positionTokenActionBar();
+    }
     if (moved && t?.explorerEnabled) {
       paintTokenExploreDrag(info, t, { force: true });
       finishTokenExploreDrag(info);
@@ -8160,6 +8271,11 @@ function onKeyDown(e) {
   }
 
   if (handleEntryHotkeyDown(e)) return;
+
+  if (moveSelectedTokenByGridKey(e)) {
+    e.preventDefault();
+    return;
+  }
 
   // Space 平移（按住）
   if (e.code === 'Space') {
@@ -8764,7 +8880,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.33.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.34.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -10938,6 +11054,7 @@ function openTokenUploadDialog(file, existingId) {
   const initEntryIds = editing ? editing.entryIds : [];
   const initExplorerEnabled = editing ? !!editing.explorerEnabled : false;
   const initExploreRadius = editing ? normalizeTokenExploreRadius(editing.exploreRadius) : TOKEN_EXPLORE_RADIUS_DEFAULT;
+  const initGridMoveEnabled = editing ? normalizeTokenGridMoveEnabled(editing.gridMoveEnabled, initExplorerEnabled) : false;
   showModal(`
     <div class="modal-title">${editing ? '编辑 Token' : '添加 Token'}</div>
     <div id="token-preview"></div>
@@ -10977,6 +11094,8 @@ function openTokenUploadDialog(file, existingId) {
       <label class="form-check" style="margin-bottom:8px;"><input id="token-explorer-enabled" type="checkbox"${initExplorerEnabled ? ' checked' : ''}> 探索 Token</label>
       <input id="token-explore-radius" type="range" min="${TOKEN_EXPLORE_RADIUS_MIN}" max="${TOKEN_EXPLORE_RADIUS_MAX}" step="5" value="${Math.round(initExploreRadius)}">
       <div class="form-note">清雾半径：<span id="token-explore-radius-value">${Math.round(initExploreRadius)}</span> px。拖动时清除地形层和事件层遮罩。</div>
+      <label class="form-check" style="margin-top:8px;"><input id="token-grid-move-enabled" type="checkbox"${initGridMoveEnabled ? ' checked' : ''}> 网格步进移动</label>
+      <div class="form-note">有网格的地图中，选中后可用方向键 / 小键盘 8、2、4、6 按格移动；鼠标拖动结束会吸附到格心。</div>
     </div>
     ${entryAssignmentHTML(initEntryIds, { defaultPurpose: 'spotlight' })}
     <div class="modal-actions">
@@ -11072,14 +11191,18 @@ function openTokenUploadDialog(file, existingId) {
       });
       $('token-name').value = initName;
       const explorerInput = $('token-explorer-enabled');
+      const gridMoveInput = $('token-grid-move-enabled');
       const radiusInput = $('token-explore-radius');
       const radiusValue = $('token-explore-radius-value');
+      let gridMoveTouched = false;
       const syncExplorerControls = () => {
         const enabled = !!explorerInput.checked;
+        if (!editing && !gridMoveTouched) gridMoveInput.checked = enabled;
         radiusInput.disabled = !enabled;
         radiusValue.textContent = Math.round(normalizeTokenExploreRadius(radiusInput.value));
       };
       explorerInput.addEventListener('change', syncExplorerControls);
+      gridMoveInput.addEventListener('change', () => { gridMoveTouched = true; });
       radiusInput.addEventListener('input', syncExplorerControls);
       syncExplorerControls();
       const cleanup = () => {
@@ -11097,6 +11220,7 @@ function openTokenUploadDialog(file, existingId) {
           entryIds: getEntryIds(),
           explorerEnabled: !!explorerInput.checked,
           exploreRadius: normalizeTokenExploreRadius(radiusInput.value),
+          gridMoveEnabled: !!gridMoveInput.checked,
         };
         cleanup();
         closeModal();
@@ -11115,6 +11239,7 @@ function openTokenUploadDialog(file, existingId) {
           editing.entryIds = opts.entryIds;
           editing.explorerEnabled = opts.explorerEnabled;
           editing.exploreRadius = opts.exploreRadius;
+          editing.gridMoveEnabled = opts.gridMoveEnabled;
           scheduleRender('all');
           updateObjectPanel();
           triggerImmediateSave();
