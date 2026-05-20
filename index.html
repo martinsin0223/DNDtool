@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -1082,6 +1082,7 @@ button.icon { padding: 6px 10px; }
   text-align: center;
   user-select: none;
   transition: transform 80ms;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", "Segoe UI Symbol", sans-serif;
 }
 .emoji-cell:hover { transform: scale(1.1); }
 .emoji-cell.selected {
@@ -1116,6 +1117,7 @@ button.icon { padding: 6px 10px; }
   font-size: 32px;
   border: 2px solid var(--theme-border);
   overflow: hidden;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", "Segoe UI Symbol", sans-serif;
 }
 #event-icon-preview img {
   width: 100%; height: 100%; object-fit: contain;
@@ -1131,6 +1133,47 @@ button.icon { padding: 6px 10px; }
   background-position: center;
   background-repeat: no-repeat;
 }
+
+.image-crop-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: -2px 0 10px;
+}
+.image-crop-panel {
+  display: none;
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-radius-md);
+  background: color-mix(in srgb, var(--theme-bg-input) 86%, transparent);
+  padding: 10px;
+  margin: 8px 0 12px;
+}
+.image-crop-panel.visible {
+  display: grid;
+  gap: 10px;
+}
+.image-crop-canvas-wrap {
+  display: flex;
+  justify-content: center;
+}
+.image-crop-canvas {
+  width: min(220px, 70vw);
+  height: min(220px, 70vw);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-radius-sm);
+  background: #111;
+  image-rendering: auto;
+}
+.image-crop-control {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--theme-text-muted);
+  font-size: 12px;
+}
+.image-crop-control input { width: 100%; }
 
 /* ============== Loading overlay ============== */
 #loading-overlay {
@@ -4323,30 +4366,6 @@ async function doImportProject(payload) {
   }
 }
 // ============== 多场景管理（v3.0） ==============
-function cloneCanvasForRuntimeCache(source) {
-  if (!source || !source.width || !source.height) return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = source.width;
-  canvas.height = source.height;
-  canvas.getContext('2d').drawImage(source, 0, 0);
-  return canvas;
-}
-
-function copyCanvasForRuntimeCache(existing, source) {
-  if (!source || !source.width || !source.height) return null;
-  const canvas = existing || document.createElement('canvas');
-  if (canvas.width !== source.width || canvas.height !== source.height) {
-    canvas.width = source.width;
-    canvas.height = source.height;
-  }
-  const ctx = canvas.getContext('2d');
-  ctx.save();
-  ctx.globalCompositeOperation = 'copy';
-  ctx.drawImage(source, 0, 0);
-  ctx.restore();
-  return canvas;
-}
-
 function cloneTokenForRuntimeCache(t) {
   return {
     ...t,
@@ -5226,10 +5245,10 @@ function drawEventIcon(ctx, ev) {
 
   // icon 本体
   if (ev.icon.type === 'emoji') {
-    ctx.font = `${Math.floor(ev.size * 0.7)}px ${state.theme.fontFamily}`;
+    ctx.font = eventIconFont(ev.size * 0.7);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = isLikelyEmojiText(ev.icon.value) ? state.theme.text : state.theme.eventIconEdge;
     ctx.fillText(ev.icon.value, scx, scy + 1);
   } else if (ev.icon.type === 'image' && ev.icon.bitmap) {
     const bm = ev.icon.bitmap;
@@ -5245,10 +5264,10 @@ function drawEventIcon(ctx, ev) {
     ctx.restore();
   } else if (ev.icon.type === 'svg-symbol') {
     // 占位：v2.0 不实施 SVG 主题包，降级为 ❓
-    ctx.font = `${Math.floor(ev.size * 0.7)}px ${state.theme.fontFamily}`;
+    ctx.font = eventIconFont(ev.size * 0.7);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = state.theme.eventIconEdge;
     ctx.fillText('❓', scx, scy + 1);
   }
 }
@@ -8728,7 +8747,7 @@ const CLOUD_SYNC_TOKEN_KEY = 'cloudSync.token';
 const CLOUD_SYNC_DEVICE_ID_KEY = 'cloudSync.deviceId';
 const CLOUD_SYNC_DEVICE_LABEL_KEY = 'cloudSync.deviceLabel';
 const CLOUD_SYNC_PAT_PAGE = 'https://github.com/settings/tokens?type=beta';
-const CLOUD_SYNC_TOOL_VERSION = 'v3.32.0';
+const CLOUD_SYNC_TOOL_VERSION = 'v3.33.0';
 const CLOUD_SYNC_SCHEMA_VERSION = 6;
 const CLOUD_SYNC_SUPPORTED_SCHEMA_VERSIONS = new Set([4, 5, 6]);
 const CLOUD_SYNC_LATEST_PATH = 'latest.json';
@@ -10815,6 +10834,83 @@ function cloudSync_bootstrap() {
   });
 }
 // ============== 加载 Token 弹窗 ==============
+const EVENT_EMOJI_FONT_FAMILY = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", "Segoe UI Symbol", sans-serif';
+
+function isLikelyEmojiText(value) {
+  return /[\u2600-\u27BF\u{1F000}-\u{1FAFF}]/u.test(String(value || ''));
+}
+
+function eventIconFont(size) {
+  const px = Math.floor(size);
+  return `${px}px ${EVENT_EMOJI_FONT_FAMILY}`;
+}
+
+function safeFileNameStem(name, fallback = 'image') {
+  const base = String(name || fallback).replace(/\.[^.]+$/, '').trim() || fallback;
+  return base.replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80);
+}
+
+async function createImageCropSession(opts) {
+  const sourceBlob = opts.sourceBlob;
+  if (!sourceBlob) throw new Error('缺少图片');
+  const canvas = opts.canvas;
+  const zoomInput = opts.zoomInput;
+  const xInput = opts.xInput;
+  const yInput = opts.yInput;
+  const aspectRatio = Number(opts.aspectRatio) || 1;
+  const outputSize = Math.max(128, Math.min(2048, Number(opts.outputSize) || 512));
+  const bitmap = await createImageBitmap(sourceBlob);
+  const ctx = canvas.getContext('2d');
+
+  const cropRect = () => {
+    const zoom = clamp(Number(zoomInput.value) || 1, 1, 4);
+    const panX = clamp(Number(xInput.value) || 0, -100, 100) / 100;
+    const panY = clamp(Number(yInput.value) || 0, -100, 100) / 100;
+    const maxCropW = Math.min(bitmap.width, bitmap.height * aspectRatio);
+    const maxCropH = maxCropW / aspectRatio;
+    const cropW = Math.max(1, maxCropW / zoom);
+    const cropH = Math.max(1, maxCropH / zoom);
+    const centerX = bitmap.width / 2 + panX * Math.max(0, (bitmap.width - cropW) / 2);
+    const centerY = bitmap.height / 2 + panY * Math.max(0, (bitmap.height - cropH) / 2);
+    const sx = clamp(centerX - cropW / 2, 0, bitmap.width - cropW);
+    const sy = clamp(centerY - cropH / 2, 0, bitmap.height - cropH);
+    return { sx, sy, sw: cropW, sh: cropH };
+  };
+
+  const render = () => {
+    const { sx, sy, sw, sh } = cropRect();
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  };
+
+  const apply = async () => {
+    const { sx, sy, sw, sh } = cropRect();
+    const out = document.createElement('canvas');
+    out.width = outputSize;
+    out.height = Math.round(outputSize / aspectRatio);
+    const outCtx = out.getContext('2d');
+    outCtx.imageSmoothingEnabled = true;
+    outCtx.imageSmoothingQuality = 'high';
+    outCtx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, out.width, out.height);
+    const blob = await new Promise((resolve) => out.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('裁切失败');
+    return blob;
+  };
+
+  const destroy = () => {
+    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+  };
+
+  zoomInput.addEventListener('input', render);
+  xInput.addEventListener('input', render);
+  yInput.addEventListener('input', render);
+  render();
+  return { render, apply, destroy };
+}
 function openTokenUploadDialog(file, existingId) {
   state.uploadingTokenFile = file;
   state.editingTokenId = existingId || null;
@@ -10828,6 +10924,17 @@ function openTokenUploadDialog(file, existingId) {
   showModal(`
     <div class="modal-title">${editing ? '编辑 Token' : '添加 Token'}</div>
     <div id="token-preview"></div>
+    <div class="image-crop-actions">
+      <button id="token-crop-toggle" type="button">裁切图片</button>
+      <button id="token-crop-reset" type="button">恢复原图</button>
+    </div>
+    <div id="token-crop-panel" class="image-crop-panel">
+      <div class="image-crop-canvas-wrap"><canvas id="token-crop-canvas" class="image-crop-canvas" width="220" height="220"></canvas></div>
+      <label class="image-crop-control"><span>缩放</span><input id="token-crop-zoom" type="range" min="1" max="4" step="0.01" value="1"></label>
+      <label class="image-crop-control"><span>左右</span><input id="token-crop-x" type="range" min="-100" max="100" step="1" value="0"></label>
+      <label class="image-crop-control"><span>上下</span><input id="token-crop-y" type="range" min="-100" max="100" step="1" value="0"></label>
+      <div class="image-crop-actions"><button id="token-crop-apply" type="button" class="primary">应用裁切</button></div>
+    </div>
     <div class="form-row">
       <label>形状</label>
       <div class="shape-options">
@@ -10862,12 +10969,62 @@ function openTokenUploadDialog(file, existingId) {
   `, {
     onMounted: async () => {
       const preview = $('token-preview');
-      let blobToPreview = file || (editing ? editing.blob : null);
+      const originalBlob = file || (editing ? editing.blob : null);
+      let currentBlob = originalBlob;
       let previewUrl = null;
-      if (blobToPreview) {
-        previewUrl = URL.createObjectURL(blobToPreview);
+      const setPreviewBlob = (blob) => {
+        if (previewUrl) try { URL.revokeObjectURL(previewUrl); } catch (_) {}
+        previewUrl = null;
+        if (!blob) {
+          preview.style.backgroundImage = '';
+          return;
+        }
+        previewUrl = URL.createObjectURL(blob);
         preview.style.backgroundImage = `url(${previewUrl})`;
-      }
+      };
+      setPreviewBlob(currentBlob);
+      let cropSession = null;
+      const closeCropPanel = () => {
+        const panel = $('token-crop-panel');
+        if (panel) panel.classList.remove('visible');
+        if (cropSession) { cropSession.destroy(); cropSession = null; }
+      };
+      const openCropPanel = async () => {
+        if (!currentBlob) { showToast('没有可裁切的图片'); return; }
+        closeCropPanel();
+        $('token-crop-panel').classList.add('visible');
+        $('token-crop-zoom').value = '1';
+        $('token-crop-x').value = '0';
+        $('token-crop-y').value = '0';
+        cropSession = await createImageCropSession({
+          sourceBlob: currentBlob,
+          canvas: $('token-crop-canvas'),
+          zoomInput: $('token-crop-zoom'),
+          xInput: $('token-crop-x'),
+          yInput: $('token-crop-y'),
+          aspectRatio: 1,
+          outputSize: 512,
+        });
+      };
+      $('token-crop-toggle').addEventListener('click', () => {
+        openCropPanel().catch((e) => showToast('裁切打开失败：' + (e.message || e)));
+      });
+      $('token-crop-reset').addEventListener('click', () => {
+        currentBlob = originalBlob;
+        setPreviewBlob(currentBlob);
+        closeCropPanel();
+      });
+      $('token-crop-apply').addEventListener('click', async () => {
+        if (!cropSession) return;
+        try {
+          const blob = await cropSession.apply();
+          currentBlob = new File([blob], safeFileNameStem(file?.name || editing?.name || 'token') + '-crop.png', { type: 'image/png' });
+          setPreviewBlob(currentBlob);
+          closeCropPanel();
+        } catch (e) {
+          showToast('裁切失败：' + (e.message || e));
+        }
+      });
       let selShape = initShape;
       const shapeBtns = document.querySelectorAll('.shape-options .option-btn');
       shapeBtns.forEach((b) => {
@@ -10908,7 +11065,10 @@ function openTokenUploadDialog(file, existingId) {
       explorerInput.addEventListener('change', syncExplorerControls);
       radiusInput.addEventListener('input', syncExplorerControls);
       syncExplorerControls();
-      const cleanup = () => { if (previewUrl) try { URL.revokeObjectURL(previewUrl); } catch (_) {} };
+      const cleanup = () => {
+        closeCropPanel();
+        if (previewUrl) try { URL.revokeObjectURL(previewUrl); } catch (_) {}
+      };
       $('token-cancel').addEventListener('click', () => { cleanup(); closeModal(); });
       $('token-confirm').addEventListener('click', async () => {
         const name = $('token-name').value.trim();
@@ -10924,6 +11084,13 @@ function openTokenUploadDialog(file, existingId) {
         cleanup();
         closeModal();
         if (editing) {
+          if (currentBlob && currentBlob !== editing.blob) {
+            try {
+              if (editing.imageBitmap && typeof editing.imageBitmap.close === 'function') editing.imageBitmap.close();
+            } catch (_) {}
+            editing.blob = currentBlob;
+            try { editing.imageBitmap = await createImageBitmap(currentBlob); } catch (_) {}
+          }
           editing.shape = opts.shape;
           editing.borderColor = opts.borderColor;
           editing.borderPattern = opts.borderPattern;
@@ -10935,9 +11102,9 @@ function openTokenUploadDialog(file, existingId) {
           updateObjectPanel();
           triggerImmediateSave();
         } else {
-          if (!file) return;
+          if (!currentBlob) return;
           setLoading('添加 Token 中…');
-          try { await createTokenFromFile(file, opts); }
+          try { await createTokenFromFile(currentBlob, opts); }
           catch (e) { showToast('添加失败：' + e.message); }
           hideLoading();
         }
@@ -10984,7 +11151,16 @@ function openEventEditDialog(file, eventId, mapX, mapY, preset = null) {
     <div class="form-row" id="image-section" style="display:none">
       <label>上传图标图片（建议 64×64 以上，PNG/JPG/WebP）</label>
       <button id="event-icon-upload-btn">选择图片</button>
+      <button id="event-icon-crop-toggle" type="button">裁切图片</button>
+      <button id="event-icon-crop-reset" type="button">恢复原图</button>
       <span id="event-icon-image-name" style="margin-left:8px;color:var(--theme-text-muted);font-size:12px;"></span>
+      <div id="event-icon-crop-panel" class="image-crop-panel">
+        <div class="image-crop-canvas-wrap"><canvas id="event-icon-crop-canvas" class="image-crop-canvas" width="220" height="220"></canvas></div>
+        <label class="image-crop-control"><span>缩放</span><input id="event-icon-crop-zoom" type="range" min="1" max="4" step="0.01" value="1"></label>
+        <label class="image-crop-control"><span>左右</span><input id="event-icon-crop-x" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="image-crop-control"><span>上下</span><input id="event-icon-crop-y" type="range" min="-100" max="100" step="1" value="0"></label>
+        <div class="image-crop-actions"><button id="event-icon-crop-apply" type="button" class="primary">应用裁切</button></div>
+      </div>
     </div>
     <div class="form-row">
       <label>标题（可选）</label>
@@ -11029,7 +11205,16 @@ function openEventEditDialog(file, eventId, mapX, mapY, preset = null) {
       let curIcon = initIcon;
       const getEntryIds = mountEntryAssignmentControl(initEntryIds, { defaultPurpose: 'spotlight' });
       let imageBlobUrl = null;
-      let pendingImageBlob = (initIcon.type === 'image' ? initIcon.blob : null);
+      const originalImageBlob = (initIcon.type === 'image' ? initIcon.blob : null);
+      let sourceImageBlob = originalImageBlob;
+      let pendingImageBlob = originalImageBlob;
+      let cropSession = null;
+
+      const closeCropPanel = () => {
+        const panel = $('event-icon-crop-panel');
+        if (panel) panel.classList.remove('visible');
+        if (cropSession) { cropSession.destroy(); cropSession = null; }
+      };
 
       const renderPreview = () => {
         const preview = $('event-icon-preview');
@@ -11048,6 +11233,36 @@ function openEventEditDialog(file, eventId, mapX, mapY, preset = null) {
         } else {
           preview.textContent = curIcon.value || '?';
         }
+      };
+
+      const setImageIconBlob = async (blob, label = '') => {
+        if (!blob) { showToast('没有可裁切的图片'); return; }
+        let bm = null;
+        try { bm = await createImageBitmap(blob); }
+        catch (e) { showToast('图片解析失败'); return; }
+        curIcon = { type: 'image', blob, bitmap: bm };
+        pendingImageBlob = blob;
+        if (label) $('event-icon-image-name').textContent = label;
+        renderPreview();
+        switchTab('image');
+      };
+
+      const openImageCropPanel = async () => {
+        if (!pendingImageBlob) { showToast('没有可裁切的图片'); return; }
+        closeCropPanel();
+        $('event-icon-crop-panel').classList.add('visible');
+        $('event-icon-crop-zoom').value = '1';
+        $('event-icon-crop-x').value = '0';
+        $('event-icon-crop-y').value = '0';
+        cropSession = await createImageCropSession({
+          sourceBlob: pendingImageBlob,
+          canvas: $('event-icon-crop-canvas'),
+          zoomInput: $('event-icon-crop-zoom'),
+          xInput: $('event-icon-crop-x'),
+          yInput: $('event-icon-crop-y'),
+          aspectRatio: 1,
+          outputSize: 512,
+        });
       };
 
       // tab 切换
@@ -11115,6 +11330,25 @@ function openEventEditDialog(file, eventId, mapX, mapY, preset = null) {
       $('event-icon-upload-btn').addEventListener('click', () => {
         $('file-input-event-icon').click();
       });
+      $('event-icon-crop-toggle').addEventListener('click', () => {
+        openImageCropPanel().catch((e) => showToast('裁切打开失败：' + (e.message || e)));
+      });
+      $('event-icon-crop-reset').addEventListener('click', async () => {
+        if (!sourceImageBlob) { showToast('没有原图可恢复'); return; }
+        closeCropPanel();
+        await setImageIconBlob(sourceImageBlob, '原图');
+      });
+      $('event-icon-crop-apply').addEventListener('click', async () => {
+        if (!cropSession) return;
+        try {
+          const blob = await cropSession.apply();
+          const cropped = new File([blob], safeFileNameStem($('event-icon-image-name').textContent || 'event-icon') + '-crop.png', { type: 'image/png' });
+          closeCropPanel();
+          await setImageIconBlob(cropped, cropped.name);
+        } catch (e) {
+          showToast('裁切失败：' + (e.message || e));
+        }
+      });
       const onIconFile = async (e) => {
         const f = e.target.files[0];
         e.target.value = '';
@@ -11124,14 +11358,9 @@ function openEventEditDialog(file, eventId, mapX, mapY, preset = null) {
           showToast('HEIC 格式不支持，请用 PNG/JPG');
           return;
         }
-        try {
-          const bm = await createImageBitmap(f);
-          curIcon = { type: 'image', blob: f, bitmap: bm };
-          pendingImageBlob = f;
-          $('event-icon-image-name').textContent = f.name;
-          renderPreview();
-          switchTab('image');
-        } catch (err) { showToast('图片解析失败'); }
+        sourceImageBlob = f;
+        closeCropPanel();
+        await setImageIconBlob(f, f.name);
       };
       $('file-input-event-icon').addEventListener('change', onIconFile);
 
@@ -11165,6 +11394,7 @@ function openEventEditDialog(file, eventId, mapX, mapY, preset = null) {
       renderPreview();
 
       const cleanup = () => {
+        closeCropPanel();
         if (imageBlobUrl) try { URL.revokeObjectURL(imageBlobUrl); } catch (_) {}
         $('file-input-event-icon').removeEventListener('change', onIconFile);
       };
